@@ -31,6 +31,7 @@ type LinkItem struct {
 	Name      string
 	ID        int
 	Page      int
+	Main      bool
 }
 
 // Константы для таблицы моделей
@@ -207,16 +208,33 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 			Name:      "Особенности системы и требования заказчика",
 			ID:        pdf.AddLink(),
 			Page:      0,
+			Main:      true,
 		})
 	}
 
-	if req.GetSelectequipment().GetTextEquipment() != "" {
-		//if req.GetSelectequipment().GetTextEquipment() != "" && len(req.GetSelectequipment().GetAccommodation()) > 0 && len(req.GetSelectequipment().GetSchema()) > 0 {
+	if req.GetSelectequipment().GetTextEquipment() != "" && len(req.GetSelectequipment().GetSchema()) > 0 && len(req.GetSelectequipment().GetAccommodation()) > 0 {
 		addLink("selectsEquipments", LinkItem{
 			ShortName: "selectsEquipments",
 			Name:      "Выбор оборудования",
 			ID:        pdf.AddLink(),
 			Page:      0,
+			Main:      true,
+		})
+
+		addLink("schemaEquipments", LinkItem{
+			ShortName: "schemaEquipments",
+			Name:      "Структурная схема проекта",
+			ID:        pdf.AddLink(),
+			Page:      0,
+			Main:      false,
+		})
+
+		addLink("accommodationEquipments", LinkItem{
+			ShortName: "accommodationEquipments",
+			Name:      "Размещение блоков системы в шкафах",
+			ID:        pdf.AddLink(),
+			Page:      0,
+			Main:      false,
 		})
 	}
 
@@ -226,6 +244,7 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		Name:      "Спецификация оборудования",
 		ID:        pdf.AddLink(),
 		Page:      0,
+		Main:      true,
 	})
 
 	addLink("characteristics", LinkItem{
@@ -233,6 +252,7 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		Name:      "Характеристики системы",
 		ID:        pdf.AddLink(),
 		Page:      0,
+		Main:      false,
 	})
 
 	//specLink := pdf.AddLink() // Ссылка на спецификацию оборудования
@@ -259,8 +279,7 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		createSystemFeatures(pdf, req.GetFeatures(), number)
 	}
 
-	if req.GetSelectequipment().GetTextEquipment() != "" {
-		//if req.GetSelectequipment().GetTextEquipment() != "" && len(req.GetSelectequipment().GetAccommodation()) > 0 && len(req.GetSelectequipment().GetSchema()) > 0 {
+	if req.GetSelectequipment().GetTextEquipment() != "" && len(req.GetSelectequipment().GetSchema()) > 0 && len(req.GetSelectequipment().GetAccommodation()) > 0 {
 		pdf.AddPage()
 		tempLink := links["selectsEquipments"]
 		tempLink.Page = pdf.PageNo()
@@ -269,6 +288,32 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		pdf.SetLink(links["selectsEquipments"].ID, 0, links["selectsEquipments"].Page)
 		number++
 		selectsEquipments(pdf, req.GetSelectequipment().GetTextEquipment(), number)
+
+		pdf.AddPage()
+		tempLink = links["schemaEquipments"]
+		tempLink.Page = pdf.PageNo()
+		links["schemaEquipments"] = tempLink
+
+		pdf.SetLink(links["schemaEquipments"].ID, 0, links["schemaEquipments"].Page)
+		imageEquipments(pdf, req.GetSelectequipment().GetSchema(), links["schemaEquipments"].Name, "schema", number, 1)
+
+		/**
+		addLink("accommodationEquipments", LinkItem{
+			ShortName: "accommodationEquipments",
+			Name:      "Размещение блоков системы в шкафах",
+			ID:        pdf.AddLink(),
+			Page:      0,
+			Main:      false,
+		})
+		*/
+		pdf.AddPage()
+		tempLink = links["accommodationEquipments"]
+		tempLink.Page = pdf.PageNo()
+		links["accommodationEquipments"] = tempLink
+
+		pdf.SetLink(links["accommodationEquipments"].ID, 0, links["accommodationEquipments"].Page)
+		imageEquipments(pdf, req.GetSelectequipment().GetAccommodation(), links["accommodationEquipments"].Name, "accommodation", number, 2)
+
 	}
 
 	// 5. Создаем таблицу моделей (Спецификация оборудования)
@@ -491,66 +536,74 @@ func createTableOfContents(pdf *gofpdf.Fpdf, tableStartPage, characteristicsPage
 	pdf.SetFont("inter", "", 12)
 
 	// Функция для добавления пункта содержания
-	addTOCItem := func(text string, pageNum int, link int) {
+	addTOCItem := func(text string, pageNum int, link int, main bool) {
 		y := pdf.GetY()
 
-		// Рисуем текст
-		pdf.SetX(78)
-		pdf.SetTextColor(237, 114, 3)
+		// Смещение и оформление текста
+		startX := 78
+		if main {
+			pdf.SetTextColor(237, 114, 3)
+			text = strings.ToUpper(text)
+		} else {
+			pdf.SetTextColor(0, 0, 0)
+			text = "     " + text // 5 пробелов
+			startX += 5           // визуальное смещение
+		}
 
-		// Если есть ссылка, делаем текст кликабельным
+		pdf.SetX(float64(startX))
+
+		// Рисуем основной текст
 		if link > 0 {
-			// Используем CellFormat с link параметром
 			pdf.CellFormat(0, 16*math, text, "", 0, "L", false, link, "")
 		} else {
 			pdf.CellFormat(0, 16*math, text, "", 0, "L", false, 0, "")
 		}
 
-		// Получаем ширину текста и страницы
+		// Ширины
 		textWidth := pdf.GetStringWidth(text)
 		pageWidth, _ := pdf.GetPageSize()
 
-		// Позиция начала точек
-		dotStartX := 78 + textWidth + 5
+		dotStartX := float64(startX) + textWidth + 5
 
-		// Если есть номер страницы
+		// Номер страницы
 		if pageNum > 0 {
-			pageNumStr := strconv.Itoa(pageNum)
+			var pageNumStr string
+			if pageNum <= 9 {
+				pageNumStr = "0" + strconv.Itoa(pageNum)
+			} else {
+				pageNumStr = strconv.Itoa(pageNum)
+			}
 			pageNumWidth := pdf.GetStringWidth(pageNumStr)
 
-			// Позиция номера страницы (65 мм от правого края)
-			pageNumX := pageWidth - 32 - 65
+			// было: pageNumX := pageWidth - 32 - 65
+			pageNumX := pageWidth - 32 - 65 + 10 // сдвиг номера на 10mm вправо
 
-			// Вычисляем доступную ширину для точек
-			availableWidth := pageNumX - dotStartX - 1
+			// было: availableWidth := pageNumX - float64(startX) - 1
+			availableWidth := pageNumX + 3 - dotStartX - 1 // ширина точек ДО номера
 
 			if availableWidth > 0 {
-				// Рассчитываем количество точек
-				dotChar := "."
-				dotWidth := pdf.GetStringWidth(dotChar)
+				dotWidth := pdf.GetStringWidth(".")
 				numDots := int(availableWidth / dotWidth)
 				if numDots <= 0 {
 					numDots = 1
 				}
-				// Рисуем точки
+
 				dotText := strings.Repeat(".", numDots)
 				pdf.SetXY(dotStartX, y)
-				pdf.SetTextColor(100, 100, 100) // Серый для точек
+				pdf.SetTextColor(120, 120, 120)
 				pdf.CellFormat(availableWidth, 16*math, dotText, "", 0, "L", false, 0, "")
 
-				// Рисуем номер страницы (тоже кликабельный, если есть ссылка)
-				pdf.SetTextColor(0, 0, 0) // Черный для номера
+				// Номер страницы
 				pdf.SetXY(pageNumX-pageNumWidth, y)
+				pdf.SetTextColor(0, 0, 0)
 
 				if link > 0 {
 					pdf.CellFormat(pageNumWidth+10, 16*math, pageNumStr, "", 0, "R", false, link, "")
 				} else {
 					pdf.CellFormat(pageNumWidth+10, 16*math, pageNumStr, "", 0, "R", false, 0, "")
 				}
-
-				// Возвращаем цвет для следующего текста
-				pdf.SetTextColor(237, 114, 3)
 			}
+
 		}
 
 		pdf.Ln(16 * math)
@@ -559,13 +612,13 @@ func createTableOfContents(pdf *gofpdf.Fpdf, tableStartPage, characteristicsPage
 	// Добавляем пункты с ссылками
 	for _, key := range order {
 		item := links[key]
-		addTOCItem(item.Name, item.Page, item.ID)
+		addTOCItem(item.Name, item.Page, item.ID, item.Main)
 	}
 
 	//addTOCItem("Спецификация оборудования", tableStartPage, specLinkID)
 	//addTOCItem("Характеристики системы", characteristicsPage, charLinkID)
 
-	if characteristicsPage == 0 {
+	if links["characteristics"].Page == 0 {
 		addWatermark(pdf)
 	}
 }
@@ -1441,11 +1494,67 @@ func drawNumberedListWordLike(pdf *gofpdf.Fpdf, items []string, leftPad, rightPa
 
 func splitByRuneLimitWordBoundary(s string, limit int) (left, right string) {
 	rs := []rune(strings.TrimSpace(s))
-	if len(rs) <= limit {
+	if len(rs) <= limit || limit <= 0 {
 		return string(rs), ""
 	}
 
-	// Ищем последнее "разделяющее" место до лимита
+	// 1) Базовый cut: последнее разделяющее место до лимита (пробел/дефисы)
+	cut := lastSeparatorCut(rs, limit)
+
+	// Если всё равно что-то пошло не так — запасной вариант
+	if cut <= 0 || cut >= len(rs) {
+		left = strings.TrimSpace(string(rs[:min(limit, len(rs))]))
+		right = strings.TrimSpace(string(rs[min(limit, len(rs)):]))
+		return
+	}
+
+	// 2) Проверяем: попали ли мы "внутрь предложения"
+	// Предложение считаем по . ! ? … (можно расширить при необходимости)
+	sStart := sentenceStart(rs, cut)
+	sEnd := sentenceEnd(rs, cut)
+
+	inSentence := (sStart < cut && cut < sEnd)
+
+	if inSentence {
+		// Сколько слов осталось до конца предложения справа
+		remainWords := countWords(rs[cut:sEnd])
+
+		// 2a) Если до конца предложения осталось 1–2 слова — дописываем их в левую
+		if remainWords <= 2 {
+			// Разрешаем небольшое превышение лимита ради 1–2 слов
+			cut = sEnd
+		} else {
+			// 2b) Иначе стараемся перенести предложение целиком в правую:
+			// cut -> начало предложения
+			// Но если начало предложения слишком рано (левая станет пустой/почти пустой),
+			// то оставляем старый cut.
+			newCut := sStart
+			if newCut > 0 {
+				leftCandidate := strings.TrimSpace(string(rs[:newCut]))
+				// "почти пустая" — на практике удобно проверять по числу слов
+				// (порог можно поменять: 0/1/2 слова).
+				if countWords([]rune(leftCandidate)) >= 3 {
+					cut = newCut
+				}
+			}
+
+			// 2c) Если предложение само по себе длиннее лимита (не уместить целиком),
+			// то переносить "целиком" бессмысленно — режем по словам как раньше.
+			if (sEnd - sStart) > limit {
+				cut = lastSeparatorCut(rs, limit)
+			}
+		}
+	}
+
+	left = strings.TrimSpace(string(rs[:cut]))
+	right = strings.TrimSpace(string(rs[cut:]))
+	return
+}
+
+func lastSeparatorCut(rs []rune, limit int) int {
+	if limit >= len(rs) {
+		return len(rs)
+	}
 	cut := limit
 	for i := limit; i > 0; i-- {
 		r := rs[i-1]
@@ -1454,10 +1563,59 @@ func splitByRuneLimitWordBoundary(s string, limit int) (left, right string) {
 			break
 		}
 	}
+	// Если до лимита вообще нет разделителей — режем строго по лимиту
+	if cut == 0 {
+		cut = limit
+	}
+	return cut
+}
 
-	left = strings.TrimSpace(string(rs[:cut]))
-	right = strings.TrimSpace(string(rs[cut:]))
-	return
+func sentenceStart(rs []rune, pos int) int {
+	// Ищем последнюю конечную пунктуацию ДО pos, старт предложения = следующий символ
+	for i := pos - 1; i >= 0; i-- {
+		if isSentenceEnd(rs[i]) {
+			return i + 1
+		}
+	}
+	return 0
+}
+
+func sentenceEnd(rs []rune, pos int) int {
+	// Ищем ближайшую конечную пунктуацию ПОСЛЕ pos
+	for i := pos; i < len(rs); i++ {
+		if isSentenceEnd(rs[i]) {
+			return i + 1
+		}
+	}
+	return len(rs)
+}
+
+func isSentenceEnd(r rune) bool {
+	switch r {
+	case '.', '!', '?', '…':
+		return true
+	default:
+		return false
+	}
+}
+
+func countWords(rs []rune) int {
+	inWord := false
+	cnt := 0
+	for _, r := range rs {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			if !inWord {
+				inWord = true
+				cnt++
+			}
+		} else if unicode.IsSpace(r) {
+			inWord = false
+		} else {
+			// пунктуация/прочее — считаем как разделитель слова
+			inWord = false
+		}
+	}
+	return cnt
 }
 
 func selectsEquipments(pdf *gofpdf.Fpdf, text string, number int) {
@@ -1504,4 +1662,26 @@ func selectsEquipments(pdf *gofpdf.Fpdf, text string, number int) {
 	// Правая колонка (с той же высоты startY)
 	pdf.SetXY(rightX, startY)
 	pdf.MultiCell(colW, lineH, rightText, "", "J", false)
+}
+
+func imageEquipments(pdf *gofpdf.Fpdf, picture []byte, name, nameImage string, number, subNumber int) {
+	positionX := 32
+	pdf.SetLeftMargin(float64(positionX))
+
+	// Заголовок раздела
+	pdf.SetY(17)
+	pdf.SetFont("montserrat", "", 24)
+	pdf.SetTextColor(237, 114, 3)
+	pdf.CellFormat(0, 24*math, strconv.Itoa(number)+"."+strconv.Itoa(subNumber), "", 0, "L", false, 0, "")
+	pdf.SetTextColor(37, 36, 36)
+	pdf.SetXY(float64(positionX+2), 17)
+	pdf.CellFormat(0, 24*math, strings.Repeat(" ", 5)+name, "", 0, "L", false, 0, "")
+
+	_, pageHeight := pdf.GetPageSize()
+	positionY := 25
+
+	// 30 -- Высота для waterMark
+	setImageIntoPDF(pdf, picture, float64(positionX), float64(positionY), 233, pageHeight-30-float64(positionY)-10, nameImage, true)
+
+	addWatermark(pdf)
 }
