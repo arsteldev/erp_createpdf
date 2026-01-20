@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package createpdffile;
+
+option go_package = './createpdffile';
+
+message Models {
+  string name = 1;
+  string short_note = 2;
+  uint32 count = 3;
+  string presence = 4;
+  string img = 5;
+  float money_one = 6;
+  float money_count = 7;
+  string icon = 8;
+}
+
+message ContactUser {
+  string full_name =  1;
+  string occupy = 2;
+  string name_org = 3;
+  string fs_org = 4;
+}
+
+message SystemFeatures {
+  string feature = 1;
+}
+
+message SelectEquipment {
+  string text_equipment = 1;
+  bytes schema = 2;
+  bytes accommodation = 3;
+}
+
+message WhoCreate {
+  string full_name =  1;
+  string occupy = 2;
+}
+
+message Contacts {
+  string email = 1;
+  string phone = 2;
+  string site = 3;
+}
+
+message Amount {
+  float money = 1;
+  string icon = 2;
+//  float eur = 2;
+//  float rub = 3;
+}
+
+message ModelsData {
+  float unit = 1;
+  float power_consumption = 2;
+  float rated_power_speaker = 3;
+  float max_power = 4;
+  float mass = 5;
+  float size = 6;
+}
+
+message FirstPage {
+  bytes start_kp_image = 1;
+  bytes company_big_image = 2;
+  bytes small_co_company_image = 3;
+  bytes main_page_image = 4;
+  uint32 id = 5;
+  string object = 6;
+  ContactUser contactuser = 7;
+  WhoCreate whocreate = 8;
+  Contacts contacts = 9;
+  bytes company_small = 10;
+  bytes co_company_small = 11;
+  uint32 id_company = 12;
+}
+
+message CreatePDFRequest {
+  FirstPage firstpage = 1;
+  Amount amount = 2;
+  repeated Models models = 3;
+  ModelsData modelsdata = 4;
+  repeated SystemFeatures features = 5;
+  SelectEquipment Selectequipment = 6;
+}
+
+
+message CreatePDFResponse {
+  bytes pdf = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+service PDFCreator {
+  rpc CreatePDF(CreatePDFRequest) returns (CreatePDFResponse);
+}
