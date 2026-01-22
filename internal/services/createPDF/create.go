@@ -59,6 +59,13 @@ var tableWidths = []float64{
 	41,  // Фото (можно сделать побольше для фото)
 }
 
+var tableWidthRecomendation = []float64{
+	10,
+	70,
+	30,
+	160,
+}
+
 var site string
 
 // Вспомогательная функция для цвета строки
@@ -247,6 +254,18 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		Main:      true,
 	})
 
+	if len(req.GetRecomendations()) != 0 {
+		addLink("recomendations", LinkItem{
+			ShortName: "recomendations",
+			Name:      "Рекомендации по дополнительному оборудованию системы",
+			ID:        pdf.AddLink(),
+			Page:      0,
+			Main:      false,
+		})
+	}
+
+	s.Log.Info("Количество рекоммендаий:" + strconv.Itoa(len(req.GetRecomendations())))
+
 	addLink("characteristics", LinkItem{
 		ShortName: "characteristics",
 		Name:      "Характеристики системы",
@@ -330,6 +349,18 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 	number++
 	_ = createModelTable(pdf, req.GetModels(), req.GetAmount(), number)
 
+	subNumber := 0
+	if len(req.GetRecomendations()) != 0 {
+		pdf.AddPage()
+		tempLink = links["recomendations"]
+		tempLink.Page = pdf.PageNo()
+		links["recomendations"] = tempLink
+
+		pdf.SetLink(links["recomendations"].ID, 0, links["recomendations"].Page)
+
+		subNumber++
+		createRecomendationsPage(pdf, req.GetRecomendations(), number, subNumber)
+	}
 	// 6. Создаем Таблицу характеристик
 	pdf.AddPage()
 	//characteristicsStartPage := pdf.PageNo()
@@ -341,7 +372,8 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 	pdf.SetLink(links["characteristics"].ID, 0, links["characteristics"].Page)
 
 	// Создаем характеристики
-	_ = createCharacteristic(pdf, req.GetModels(), req.GetModelsdata(), number)
+	subNumber++
+	_ = createCharacteristic(pdf, req.GetModels(), req.GetModelsdata(), number, subNumber)
 
 	// 7. ВОЗВРАЩАЕМСЯ на страницу содержания для обновления номеров
 	currentPageBeforeUpdate := pdf.PageNo() // Сохраняем текущую страницу
@@ -406,83 +438,76 @@ func createCoverPage(pdf *gofpdf.Fpdf, firstPage *createpdffile.FirstPage) {
 
 	// 1. Фоновая картинка (startKpImage) - на всю страницу
 	pageWidth, pageHeight := pdf.GetPageSize()
-	setImageIntoPDF(pdf, firstPage.GetStartKpImage(), 0, 0, pageWidth, pageHeight, "coverBackground", true)
+	SetImageIntoPDF(pdf, firstPage.GetStartKpImage(), 0, 0, pageWidth, pageHeight, "coverBackground", true)
 
 	// 2. Логотип компании в левом углу (companyBigImage)
-	setImageIntoPDF(pdf, firstPage.GetCompanyBigImage(), 34, 17, 60, 15, "companyLogo", false)
+	SetImageIntoPDF(pdf, firstPage.GetCompanyBigImage(), 34, 17, 60, 15, "companyLogo", false)
 
 	// 3. Малый логотип в правом углу (smallCoCompanyImage)
-	setImageIntoPDF(pdf, firstPage.GetSmallCoCompanyImage(), pageWidth-64, 19, 32, 9, "smallLogo", false)
+	SetImageIntoPDF(pdf, firstPage.GetSmallCoCompanyImage(), pageWidth-64, 19, 32, 9, "smallLogo", false)
 
 	// 4. Картинка, которая стоит в по центру 1 страницы
-	setImageIntoPDF(pdf, firstPage.GetMainPageImage(), pageWidth-120, pageHeight-130, 110, 50, "mainPageLogo", false)
+	SetImageIntoPDF(pdf, firstPage.GetMainPageImage(), pageWidth-120, pageHeight-130, 110, 50, "mainPageLogo", false)
 
 	// Картинки, которые я буду использовать в addWaterMark легче было загрузить сразу, а потом только использовать по их имени.
 	// Именно поэтому они и 1 и 1 и -10, -10
-	setImageIntoPDF(pdf, firstPage.GetSmallCoCompanyImage(), -10, -10, 1, 1, "leftImageIntoWaterMark", false)
-	setImageIntoPDF(pdf, firstPage.GetCompanySmall(), -10, -10, 1, 1, "rightImageIntoWaterMark", false)
+	SetImageIntoPDF(pdf, firstPage.GetSmallCoCompanyImage(), -10, -10, 1, 1, "leftImageIntoWaterMark", false)
+	SetImageIntoPDF(pdf, firstPage.GetCompanySmall(), -10, -10, 1, 1, "rightImageIntoWaterMark", false)
 
 	// Заголовок
-	pdf.SetFont("montserrat", "M", 34)
-	pdf.SetTextColor(37, 36, 36)
-	pdf.SetY(47)
-	pdf.MultiCell(0, 38*math, "КОММЕРЧЕСКОЕ\nПРЕДЛОЖЕНИЕ", "", "L", false)
-	//pdf.CellFormat(0, 20, "", "", 1, "L", false, 0, "")
-	//pdf.SetXY(30, 55)
-	//pdf.CellFormat(0, 20, "ПРЕДЛОЖЕНИЕ", "", 1, "L", false, 0, "")
+	Text(
+		pdf,
+		RGBColor{R: 37, G: 36, B: 36},
+		Font{font: "montserrat", style: "M", size: 34},
+		Position{X: -1, Y: 47},
+		MultiCellString{w: 0, h: 38 * math, txtStr: "КОММЕРЧЕСКОЕ\nПРЕДЛОЖЕНИЕ", borderStr: "", alignStr: "L", fill: false},
+	)
 
 	// Исх № От Дата
 	textStr := fmt.Sprintf("Исх. № %d от %s г.", firstPage.GetId(), time.Now().Format("02.01.2006"))
-	pdf.SetFont("montserrat", "M", 9)
-	pdf.SetTextColor(254, 80, 0)
-	pdf.SetY(87)
-	pdf.MultiCell(0, 10.8*math, textStr, "", "L", false)
+	Text(
+		pdf,
+		RGBColor{R: 254, G: 80, B: 0},
+		Font{font: "montserrat", style: "M", size: 9},
+		Position{X: -1, Y: 87},
+		MultiCellString{w: 0, h: 10.8 * math, txtStr: textStr, borderStr: "", alignStr: "L", fill: false},
+	)
 
 	// Информация о человеке которому скидываем ПДФ
-	pdf.SetFont("inter", "B", 12)
-	pdf.SetTextColor(0, 0, 0)
-	pdf.SetY(104)
-	pdf.MultiCell(0, 14.4*math, firstPage.GetContactuser().GetFullName(), "", "L", false)
+	Text(
+		pdf,
+		RGBColor{R: 0, G: 0, B: 0},
+		Font{font: "inter", style: "B", size: 12},
+		Position{X: -1, Y: 104},
+		MultiCellString{w: 0, h: 14.4 * math, txtStr: firstPage.GetContactuser().GetFullName(), borderStr: "", alignStr: "L", fill: false},
+	)
 
-	pdf.SetFont("inter", "I", 10)
-	pdf.SetTextColor(0, 0, 0)
-	drawContactInfo(pdf, firstPage.GetContactuser())
+	color000 := RGBColor{R: 0, G: 0, B: 0}
+	fontInterBold12 := Font{font: "inter", style: "B", size: 12}
+	fontInterRegular12 := Font{font: "inter", style: "", size: 12}
+	fontInterItalic10 := Font{font: "inter", style: "I", size: 10}
 
+	//pdf.SetFont("inter", "I", 10)
+	//pdf.SetTextColor(0, 0, 0)
+	//drawContactInfo(firstPage.GetContactuser())
+	Text(pdf, color000, fontInterItalic10, Position{X: -1, Y: -1}, MultiCellString{0, 12 * math, drawContactInfo(firstPage.GetContactuser()), "", "L", false})
 	// Объект
-	pdf.SetFont("inter", "B", 12)
-	pdf.SetTextColor(0, 0, 0)
-	pdf.SetY(122)
-	pdf.CellFormat(0, 14.4*math, "Объект:", "", 1, "L", false, 0, "")
-
-	pdf.SetFont("inter", "", 12)
-	pdf.SetY(126)
-	pdf.CellFormat(0, 14.4*math, firstPage.GetObject(), "", 1, "L", false, 0, "")
+	TextCellFormat(pdf, color000, fontInterBold12, Position{X: -1, Y: 122}, CellString{0, 14.4 * math, "Объект:", "", 1, "L", false, 0, ""})
+	TextCellFormat(pdf, color000, fontInterRegular12, Position{X: -1, Y: 126}, CellString{0, 14.4 * math, firstPage.GetObject(), "", 1, "L", false, 0, ""})
 
 	// Кто выполнил (Менеджер)
-	pdf.SetFont("inter", "B", 12)
-	pdf.SetTextColor(0, 0, 0)
-	pdf.SetY(138)
-	pdf.CellFormat(0, 14.4*math, "Выполнил:", "", 1, "L", false, 0, "")
-	//pdf.SetY(138)
-	pdf.SetFont("inter", "", 12)
-	pdf.CellFormat(0, 14.4*math, firstPage.GetWhocreate().GetFullName(), "", 1, "L", false, 0, "")
-	pdf.SetFont("inter", "I", 10)
-	//pdf.SetY(143)
-	pdf.CellFormat(0, 12*math, firstPage.GetWhocreate().GetOccupy(), "", 1, "L", false, 0, "")
+	TextCellFormat(pdf, color000, fontInterBold12, Position{X: -1, Y: 138}, CellString{0, 14.4 * math, "Выполнил:", "", 1, "L", false, 0, ""})
+	TextCellFormat(pdf, color000, fontInterRegular12, Position{X: -1, Y: -1}, CellString{0, 14.4 * math, firstPage.GetWhocreate().GetFullName(), "", 1, "L", false, 0, ""})
+	TextCellFormat(pdf, color000, fontInterItalic10, Position{X: -1, Y: -1}, CellString{0, 12 * math, firstPage.GetWhocreate().GetOccupy(), "", 1, "L", false, 0, ""})
 
 	// Контактная информация
-	pdf.SetFont("inter", "B", 12)
-	pdf.SetTextColor(0, 0, 0)
-	pdf.SetY(153)
-	pdf.CellFormat(0, 14.4*math, "Контакты:", "", 1, "L", false, 0, "")
+	TextCellFormat(pdf, color000, fontInterBold12, Position{X: -1, Y: 153}, CellString{0, 14.4 * math, "Контакты:", "", 1, "L", false, 0, ""})
 
-	pdf.SetFont("inter", "", 12)
-	pdf.SetY(158)
 	contactText := "тел.:" + firstPage.GetContacts().GetPhone() + "\n" + "e-mail.:" + firstPage.GetContacts().GetEmail() + "\n" + site
-	pdf.MultiCell(0, 14.4*math, contactText, "", "L", false)
+	Text(pdf, color000, fontInterRegular12, Position{X: -1, Y: 158}, MultiCellString{0, 14.4 * math, contactText, "", "L", false})
 }
 
-func drawContactInfo(pdf *gofpdf.Fpdf, contactUser *createpdffile.ContactUser) {
+func drawContactInfo(contactUser *createpdffile.ContactUser) string {
 	occupy := contactUser.GetOccupy()
 	fsOrg := contactUser.GetFsOrg()
 	nameOrg := contactUser.GetNameOrg()
@@ -490,39 +515,19 @@ func drawContactInfo(pdf *gofpdf.Fpdf, contactUser *createpdffile.ContactUser) {
 	fullText := strings.TrimSpace(fmt.Sprintf("%s %s %s", occupy, fsOrg, nameOrg))
 
 	if len(fullText) <= 45 {
-		pdf.MultiCell(0, 12*math, fullText, "", "L", false)
+		return fullText
+		//pdf.MultiCell(0, 12*math, fullText, "", "L", false)
 	} else {
-		pdf.MultiCell(0, 12*math, occupy+"\n"+fmt.Sprintf("%s %s", fsOrg, nameOrg), "", "L", false)
+		return occupy + "\n" + fmt.Sprintf("%s %s", fsOrg, nameOrg)
+		//pdf.MultiCell(0, 12*math, occupy+"\n"+fmt.Sprintf("%s %s", fsOrg, nameOrg), "", "L", false)
 	}
-}
-
-func convertPNG16to8(imageData []byte) ([]byte, error) {
-	// Декодируем изображение
-	img, err := png.Decode(bytes.NewReader(imageData))
-	if err != nil {
-		return nil, err
-	}
-
-	// Конвертируем в 8-бит
-	img8 := imaging.Clone(img)
-
-	// Кодируем обратно в PNG-8
-	var buf bytes.Buffer
-	encoder := png.Encoder{
-		CompressionLevel: png.DefaultCompression,
-	}
-	err = encoder.Encode(&buf, img8)
-	if err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
 }
 
 // Страница 2: Содержание
 func createTableOfContents(pdf *gofpdf.Fpdf, tableStartPage, characteristicsPage int, links map[string]LinkItem, order []string) {
 	// Устанавливаем отступы
-	pdf.SetLeftMargin(78)
+	//pdf.SetLeftMargin(78)
+	pdf.SetLeftMargin(48)
 	pdf.SetTopMargin(44)
 	pdf.SetY(44)
 
@@ -540,7 +545,7 @@ func createTableOfContents(pdf *gofpdf.Fpdf, tableStartPage, characteristicsPage
 		y := pdf.GetY()
 
 		// Смещение и оформление текста
-		startX := 78
+		startX := 48
 		if main {
 			pdf.SetTextColor(237, 114, 3)
 			text = strings.ToUpper(text)
@@ -576,7 +581,7 @@ func createTableOfContents(pdf *gofpdf.Fpdf, tableStartPage, characteristicsPage
 			pageNumWidth := pdf.GetStringWidth(pageNumStr)
 
 			// было: pageNumX := pageWidth - 32 - 65
-			pageNumX := pageWidth - 32 - 65 + 10 // сдвиг номера на 10mm вправо
+			pageNumX := pageWidth - 32 - 65 + 20 // сдвиг номера на 20mm вправо
 
 			// было: availableWidth := pageNumX - float64(startX) - 1
 			availableWidth := pageNumX + 3 - dotStartX - 1 // ширина точек ДО номера
@@ -1092,7 +1097,7 @@ func addWatermark(pdf *gofpdf.Fpdf) {
 	currentPageS := fmt.Sprintf("%02d", currentPage)
 
 	// Четная/нечетная страница
-	if currentPage%2 == 0 {
+	if currentPage%2 == 1 {
 		// Четная страница
 
 		// 1. Номер страницы справа (у правого края)
@@ -1103,7 +1108,8 @@ func addWatermark(pdf *gofpdf.Fpdf) {
 
 		// 2. Сайт слева от номера страницы (отступ 50 пунктов)
 		pdf.SetTextColor(17, 22, 25)
-		siteX := pageNumX - 50
+		//siteX := pageNumX - 50
+		siteX := pageNumX - 30
 		pdf.SetXY(siteX, forLine+lineY)
 		pdf.CellFormat(0, 20, site, "", 0, "L", false, 0, "")
 
@@ -1121,7 +1127,8 @@ func addWatermark(pdf *gofpdf.Fpdf) {
 
 		// 2. Сайт справа от номера страницы
 		pdf.SetTextColor(17, 22, 25)
-		siteX := leftMargin + 25 // Отступ от номера страницы
+		//siteX := leftMargin + 25 // Отступ от номера страницы
+		siteX := leftMargin + 20 // Отступ от номера страницы
 		pdf.SetXY(siteX, forLine+lineY)
 		pdf.CellFormat(0, 20, site, "", 0, "L", false, 0, "")
 
@@ -1164,32 +1171,10 @@ func createConclusionPage(pdf *gofpdf.Fpdf) {
 	pdf.CellFormat(0, 10, "Благодарим за использование нашего сервиса!", "", 1, "C", false, 0, "")
 }
 
-func getImageType(imageData []byte) string {
-	if len(imageData) < 12 {
-		return ""
-	}
-
-	// Проверяем сигнатуры разных форматов
-	switch {
-	// JPEG: начинается с FF D8 FF
-	case bytes.HasPrefix(imageData, []byte{0xFF, 0xD8, 0xFF}):
-		return "jpg"
-	// PNG: начинается с 89 50 4E 47 0D 0A 1A 0A
-	case bytes.HasPrefix(imageData, []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}):
-		return "png"
-	// GIF: начинается с "GIF87a" или "GIF89a"
-	case bytes.HasPrefix(imageData, []byte{0x47, 0x49, 0x46, 0x38, 0x37, 0x61}) ||
-		bytes.HasPrefix(imageData, []byte{0x47, 0x49, 0x46, 0x38, 0x39, 0x61}):
-		return "gif"
-	default:
-		return ""
-	}
-}
-
-func setDefaultBackground(pdf *gofpdf.Fpdf) {
-	pdf.SetFillColor(41, 128, 185)
-	pdf.Rect(0, 0, 297, 210, "F")
-}
+//func setDefaultBackground(pdf *gofpdf.Fpdf) {
+//	pdf.SetFillColor(41, 128, 185)
+//	pdf.Rect(0, 0, 297, 210, "F")
+//}
 
 func setSpecificationEquipment(pdf *gofpdf.Fpdf, idCompany, number int) {
 	switch idCompany {
@@ -1219,49 +1204,49 @@ func setSpecificationEquipment(pdf *gofpdf.Fpdf, idCompany, number int) {
 	}
 }
 
-func setImageIntoPDF(pdf *gofpdf.Fpdf, imageData []byte, positionX, positionY, width, height float64, nameImage string, withDefault bool) {
-	if len(imageData) == 0 {
-		if withDefault {
-			setDefaultBackground(pdf)
-		}
-		return
-	}
+//func setImageIntoPDF(pdf *gofpdf.Fpdf, imageData []byte, positionX, positionY, width, height float64, nameImage string, withDefault bool) {
+//	if len(imageData) == 0 {
+//		if withDefault {
+//			setDefaultBackground(pdf)
+//		}
+//		return
+//	}
+//
+//	// Пытаемся определить тип изображения
+//	imageType := getImageType(imageData)
+//
+//	// Если тип PNG или не определен (возможно PNG 16-bit), пробуем конвертировать
+//	if imageType == "" || imageType == "png" || imageType == "PNG" {
+//		if convertedData, err := convertPNG16to8(imageData); err == nil && len(convertedData) > 0 {
+//			// Проверяем, что конвертация дала валидный PNG
+//			if newType := getImageType(convertedData); newType == "png" {
+//				imageData = convertedData
+//				imageType = "png"
+//			}
+//		}
+//	}
+//
+//	// Если тип все еще не определен
+//	if imageType == "" {
+//		if withDefault {
+//			setDefaultBackground(pdf)
+//		}
+//		return
+//	}
+//
+//	reader := bytes.NewReader(imageData)
+//	imgInfo := pdf.RegisterImageReader(nameImage, imageType, reader)
+//	if imgInfo == nil {
+//		if withDefault {
+//			setDefaultBackground(pdf)
+//		}
+//		return
+//	}
+//
+//	pdf.Image(nameImage, positionX, positionY, width, height, false, "", 0, "")
+//}
 
-	// Пытаемся определить тип изображения
-	imageType := getImageType(imageData)
-
-	// Если тип PNG или не определен (возможно PNG 16-bit), пробуем конвертировать
-	if imageType == "" || imageType == "png" || imageType == "PNG" {
-		if convertedData, err := convertPNG16to8(imageData); err == nil && len(convertedData) > 0 {
-			// Проверяем, что конвертация дала валидный PNG
-			if newType := getImageType(convertedData); newType == "png" {
-				imageData = convertedData
-				imageType = "png"
-			}
-		}
-	}
-
-	// Если тип все еще не определен
-	if imageType == "" {
-		if withDefault {
-			setDefaultBackground(pdf)
-		}
-		return
-	}
-
-	reader := bytes.NewReader(imageData)
-	imgInfo := pdf.RegisterImageReader(nameImage, imageType, reader)
-	if imgInfo == nil {
-		if withDefault {
-			setDefaultBackground(pdf)
-		}
-		return
-	}
-
-	pdf.Image(nameImage, positionX, positionY, width, height, false, "", 0, "")
-}
-
-func createCharacteristic(pdf *gofpdf.Fpdf, additionallyEquipment []*createpdffile.Models, characteristicData *createpdffile.ModelsData, number int) int {
+func createCharacteristic(pdf *gofpdf.Fpdf, additionallyEquipment []*createpdffile.Models, characteristicData *createpdffile.ModelsData, number, subNumber int) int {
 	startPage := pdf.PageNo()
 	var endPage int
 	pdf.SetLeftMargin(32)
@@ -1270,7 +1255,7 @@ func createCharacteristic(pdf *gofpdf.Fpdf, additionallyEquipment []*createpdffi
 	pdf.SetY(17)
 	pdf.SetFont("montserrat", "", 24)
 	pdf.SetTextColor(237, 114, 3)
-	pdf.CellFormat(0, 24*math, strconv.Itoa(number)+".1", "", 0, "L", false, 0, "")
+	pdf.CellFormat(0, 24*math, strconv.Itoa(number)+"."+strconv.Itoa(subNumber), "", 0, "L", false, 0, "")
 	pdf.SetTextColor(37, 36, 36)
 	pdf.SetXY(34, 17)
 	pdf.CellFormat(0, 24*math, strings.Repeat(" ", 5)+"Характеристики системы", "", 0, "L", false, 0, "")
@@ -1620,17 +1605,18 @@ func countWords(rs []rune) int {
 
 func selectsEquipments(pdf *gofpdf.Fpdf, text string, number int) {
 	// Большая цифра
-	pdf.SetXY(25, 0)
-	pdf.SetFont("montserrat", "", 74)
-	pdf.SetTextColor(255, 89, 3)
-	pdf.CellFormat(50, 50, strconv.Itoa(number), "", 0, "L", false, 0, "")
+	//pdf.SetXY(25, 0)
+	//pdf.SetFont("montserrat", "", 74)
+	//pdf.SetTextColor(255, 89, 3)
+	//pdf.CellFormat(50, 50, strconv.Itoa(number), "", 0, "L", false, 0, "")
+	TextCellFormat(pdf, RGBColor{R: 255, G: 89, B: 3}, Font{font: "montserrat", style: "", size: 74}, Position{25, 0}, CellString{50, 50, strconv.Itoa(number), "", 0, "L", false, 0, ""})
 
 	// Заголовок
-	pdf.SetFont("montserrat", "", 28)
-	pdf.SetTextColor(17, 22, 25)
-	pdf.SetXY(50, 13.5)
-	pdf.MultiCell(200, 10, "ВЫБОР\nОБОРУДОВАНИЯ", "", "L", false)
-
+	//pdf.SetFont("montserrat", "", 28)
+	//pdf.SetTextColor(17, 22, 25)
+	//pdf.SetXY(50, 13.5)
+	//pdf.MultiCell(200, 10, "ВЫБОР\nОБОРУДОВАНИЯ", "", "L", false)
+	Text(pdf, RGBColor{17, 22, 25}, Font{"montserrat", "", 28}, Position{50, 13.5}, MultiCellString{200, 10, "ВЫБОР\nОБОРУДОВАНИЯ", "", "L", false})
 	// --- ТЕКСТ В 2 КОЛОНКИ ---
 
 	// Параметры колонок
@@ -1668,20 +1654,65 @@ func imageEquipments(pdf *gofpdf.Fpdf, picture []byte, name, nameImage string, n
 	positionX := 32
 	pdf.SetLeftMargin(float64(positionX))
 
-	// Заголовок раздела
-	pdf.SetY(17)
-	pdf.SetFont("montserrat", "", 24)
-	pdf.SetTextColor(237, 114, 3)
-	pdf.CellFormat(0, 24*math, strconv.Itoa(number)+"."+strconv.Itoa(subNumber), "", 0, "L", false, 0, "")
-	pdf.SetTextColor(37, 36, 36)
-	pdf.SetXY(float64(positionX+2), 17)
-	pdf.CellFormat(0, 24*math, strings.Repeat(" ", 5)+name, "", 0, "L", false, 0, "")
+	font := Font{
+		font:  "montserrat",
+		style: "",
+		size:  24,
+	}
+	TextCellFormat(pdf, RGBColor{R: 237, G: 114, B: 3}, font,
+		Position{X: -1, Y: 17},
+		CellString{w: 0, h: 24 * math, txtStr: strconv.Itoa(number) + "." + strconv.Itoa(subNumber), borderStr: "", ln: 0, alignStr: "L", fill: false, link: 0, linkStr: ""},
+	)
+
+	TextCellFormat(pdf, RGBColor{R: 37, G: 36, B: 36}, font,
+		Position{X: float64(positionX + 2), Y: 17},
+		CellString{w: 0, h: 24 * math, txtStr: strings.Repeat(" ", 5) + name, borderStr: "", ln: 0, alignStr: "L", fill: false, link: 0, linkStr: ""},
+	)
 
 	_, pageHeight := pdf.GetPageSize()
 	positionY := 25
 
 	// 30 -- Высота для waterMark
-	setImageIntoPDF(pdf, picture, float64(positionX), float64(positionY), 233, pageHeight-30-float64(positionY)-10, nameImage, true)
+	SetImageIntoPDF(pdf, picture, float64(positionX), float64(positionY), 233, pageHeight-30-float64(positionY)-10, nameImage, true)
 
 	addWatermark(pdf)
+}
+
+func createRecomendationsPage(pdf *gofpdf.Fpdf, recomendations []*createpdffile.Recomendations, number, subNumber int) {
+	defer addWatermark(pdf)
+
+	positionX := 32
+	pdf.SetLeftMargin(float64(positionX))
+
+	font := Font{
+		font:  "montserrat",
+		style: "",
+		size:  24,
+	}
+
+	color := RGBColor{R: 37, G: 36, B: 36}
+
+	TextCellFormat(pdf, RGBColor{R: 237, G: 114, B: 3}, font,
+		Position{X: -1, Y: 17},
+		CellString{w: 0, h: 24 * math, txtStr: strconv.Itoa(number) + "." + strconv.Itoa(subNumber), borderStr: "", ln: 0, alignStr: "L", fill: false, link: 0, linkStr: ""},
+	)
+
+	TextCellFormat(pdf, color, font,
+		Position{X: float64(positionX + 2), Y: 17},
+		CellString{w: 0, h: 24 * math, txtStr: strings.Repeat(" ", 5) + "Рекомендации по дополнительному", borderStr: "", ln: 0, alignStr: "L", fill: false, link: 0, linkStr: ""},
+	)
+
+	TextCellFormat(pdf, color, font,
+		Position{X: -1, Y: 25},
+		CellString{w: 0, h: 24 * math, txtStr: "оборудованию системы", borderStr: "", ln: 0, alignStr: "L", fill: false, link: 0, linkStr: ""},
+	)
+
+	headers := []string{
+		"№",
+		"Наименование,\nописание оборудования",
+		"Кол-во,\nшт.",
+		"Примечание",
+	}
+
+	DrawTableHeader(pdf, tableWidthRecomendation, headers, 16.932)
 }

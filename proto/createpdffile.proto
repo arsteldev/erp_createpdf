@@ -43,6 +43,12 @@ message Contacts {
   string site = 3;
 }
 
+message Recomendations {
+  string name = 1;
+  uint32 count = 2;
+  string description = 3;
+}
+
 message Amount {
   float money = 1;
   string icon = 2;
@@ -81,6 +87,7 @@ message CreatePDFRequest {
   ModelsData modelsdata = 4;
   repeated SystemFeatures features = 5;
   SelectEquipment Selectequipment = 6;
+  repeated Recomendations recomendations = 7;
 }
 
 
