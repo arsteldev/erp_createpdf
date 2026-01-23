@@ -32,6 +32,14 @@ type CellString struct {
 }
 
 type Position struct {
-	X float64
-	Y float64
+	X, Y float64
+}
+
+type Parametrs struct {
+	Width, Height float64
+}
+
+type Row struct {
+	Width float64
+	Text  string
 }

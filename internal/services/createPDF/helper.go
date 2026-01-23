@@ -124,36 +124,27 @@ func convertPNG16to8(imageData []byte) ([]byte, error) {
 }
 
 func DrawTableHeader(pdf *gofpdf.Fpdf, widths []float64, headers []string, headerHeights float64) {
+	pdf.SetY(50)
 	// Темно-серый фон #3d4a4d
-	pdf.SetFillColor(61, 74, 77)
+	//pdf.SetFillColor(61, 74, 77)
 	pdf.SetTextColor(255, 255, 255)
 	pdf.SetFont("Inter", "B", 9.5)
 
 	// Для шапки делаем границы того же цвета что и фон
 	pdf.SetDrawColor(61, 74, 77)
 
-	//headers := []string{
-	//	"№",
-	//	"Наименование,\nописание оборудования",
-	//	"Кол-во,\nшт.",
-	//	"Цена",
-	//	"Сумма",
-	//	"Наличие",
-	//	"Фото",
-	//}
-
-	headerHeight := headerHeights
 	currentY := pdf.GetY()
 	startX := pdf.GetX()
 
 	// 1. Сначала закрашиваем всю полосу от левого края до правого
 	pageWidth, _ := pdf.GetPageSize()
-	leftMargin := 0.0
-	rightMargin := 0.0
-
-	// Закрашиваем всю полосу
-	pdf.SetXY(leftMargin, currentY)
-	pdf.CellFormat(pageWidth-leftMargin-rightMargin, headerHeight, "", "0", 0, "C", true, 0, "")
+	drawBackgroud(pdf, Position{X: 0, Y: currentY}, Parametrs{Width: pageWidth, Height: headerHeights}, RGBColor{R: 61, G: 74, B: 77})
+	//leftMargin := 0.0
+	//rightMargin := 0.0
+	//
+	//// Закрашиваем всю полосу
+	//pdf.SetXY(leftMargin, currentY)
+	//pdf.CellFormat(pageWidth-leftMargin-rightMargin, headerHeights, "", "0", 0, "C", true, 0, "")
 
 	// 2. Теперь рисуем текст в ячейках
 	// Функция для рисования ячейки с многострочным текстом
@@ -189,10 +180,139 @@ func DrawTableHeader(pdf *gofpdf.Fpdf, widths []float64, headers []string, heade
 			align = "L"
 		}
 
-		drawHeaderCell(x, currentY, widths[i], headerHeight, header, align)
+		drawHeaderCell(x, currentY, widths[i], headerHeights, header, align)
 		x += widths[i]
 	}
 
 	// Устанавливаем позицию для следующей строки
-	pdf.SetXY(startX, currentY+headerHeight)
+	pdf.SetXY(startX, currentY+headerHeights)
+}
+
+//func DrawTableRow(pdf *gofpdf.Fpdf, index int, columns []Column, widths []float64, isEvenRow bool) {
+//	// Определяем цвет фона строки
+//	var fillColor RGBColor
+//	if isEvenRow {
+//		fillColor = RGBColor{232, 237, 237} // #e8eded - серая строка
+//	} else {
+//		fillColor = RGBColor{255, 255, 255} // #ffffff - белая строка
+//	}
+//
+//	// Устанавливаем цвет заливки и границы
+//	pdf.SetFillColor(fillColor.R, fillColor.G, fillColor.B)
+//	pdf.SetDrawColor(fillColor.R, fillColor.G, fillColor.B) // Границы того же цвета!
+//	pdf.SetLineWidth(0.1)
+//
+//	currentY := pdf.GetY()
+//	startX := pdf.GetX()
+//
+//	// 1. Сначала закрашиваем всю полосу от левого края до правого
+//	pageWidth, _ := pdf.GetPageSize()
+//
+//	// Сохраняем текущую X позицию
+//	originalX := startX
+//
+//	// Закрашиваем всю полосу от левого до правого края
+//	pdf.SetXY(0, currentY)
+//	pdf.CellFormat(pageWidth, rowHeight, "", "0", 0, "C", true, 0, "")
+//
+//	// Возвращаемся к начальной позиции для рисования ячеек
+//	pdf.SetXY(originalX, currentY)
+//
+//	// 1. Ячейка №
+//	pdf.SetTextColor(17, 22, 25)
+//	pdf.SetFont("Inter", "", 10.5)
+//	pdf.CellFormat(widths[0], rowHeight, strconv.Itoa(index+1), "1", 0, "C", true, 0, "")
+//
+//	// 2. Ячейка Наименование (рисуем сначала ячейку, потом текст)
+//	nameX := startX + widths[0]
+//
+//	// Рисуем заполненную ячейку
+//	pdf.SetXY(nameX, currentY)
+//	pdf.CellFormat(widths[1], rowHeight, "", "1", 0, "C", true, 0, "")
+//
+//	// Пишем текст в ячейке
+//	name := picture.GetName()
+//	desc := picture.GetShortNote()
+//	if desc == "" {
+//		desc = "Оборудование системы"
+//	}
+//
+//	// Название (верхняя строка) - ОРАНЖЕВЫЙ ЦВЕТ
+//	pdf.SetXY(nameX+3, currentY+10)
+//	pdf.SetTextColor(255, 89, 3) // #ff5903 - ОРАНЖЕВЫЙ!
+//	pdf.SetFont("Inter", "B", 10.5)
+//
+//	// Используем MultiCell для автоматического переноса названия
+//	pdf.MultiCell(widths[1]-6, 5, name, "", "L", false)
+//
+//	// Запоминаем позицию Y после названия
+//	yAfterName := pdf.GetY()
+//
+//	// Описание (нижняя строка) - ЧЕРНЫЙ ЦВЕТ
+//	descStartY := yAfterName + 1 // Ровно 5mm отступа от названия
+//	pdf.SetXY(nameX+3, descStartY)
+//	pdf.SetTextColor(17, 22, 25) // #111619 - ЧЕРНЫЙ
+//	pdf.SetFont("Inter", "", 10.5)
+//
+//	// Рассчитываем доступную высоту для описания
+//	availableHeight := rowHeight - (descStartY - currentY) - 3 // Минус отступы
+//
+//	// Используем MultiCell для описания с ограничением по высоте
+//	linesNeeded := int(pdf.GetStringWidth(desc) / (widths[1] - 6))
+//	lineHeight := 4.5
+//	maxLines := int(availableHeight / lineHeight)
+//
+//	// Если описание слишком длинное - обрезаем
+//	if linesNeeded > maxLines {
+//		// Находим, где обрезать
+//		words := strings.Fields(desc)
+//		truncated := ""
+//
+//		for _, word := range words {
+//			test := truncated + word + " "
+//			if pdf.GetStringWidth(test) > (widths[1]-6)*float64(maxLines) {
+//				truncated = strings.TrimSpace(truncated) + "..."
+//				break
+//			}
+//			truncated = test
+//		}
+//		desc = strings.TrimSpace(truncated)
+//	}
+//
+//	// Рисуем описание
+//	pdf.MultiCell(widths[1]-6, lineHeight, desc, "", "L", false)
+//
+//	// Возвращаемся к правильной позиции для следующих ячеек
+//	pdf.SetXY(nameX+widths[1], currentY)
+//
+//	// 3. Кол-во
+//	count := strconv.Itoa(int(picture.GetCount()))
+//	pdf.CellFormat(widths[2], rowHeight, count, "1", 0, "C", true, 0, "")
+//
+//	// 4. Цена
+//	icon := picture.GetIcon()
+//	cents := picture.GetMoneyOne()
+//	pdf.CellFormat(widths[3], rowHeight, fmt.Sprintf("%.2f", float64(cents)/100.0)+icon, "1", 0, "C", true, 0, "")
+//
+//	// 5. Сумма
+//	cents = picture.GetMoneyCount()
+//	pdf.CellFormat(widths[4], rowHeight, fmt.Sprintf("%.2f", float64(cents)/100.0)+icon, "1", 0, "C", true, 0, "")
+//
+//	// 6. Наличие
+//	pdf.CellFormat(widths[5], rowHeight, picture.GetPresence(), "1", 0, "C", true, 0, "")
+//
+//	// 7. Фото
+//	photoX := pdf.GetX()
+//	pdf.CellFormat(widths[6], rowHeight, "", "1", 1, "C", true, 0, "")
+//
+//	// Рисуем фото (или заглушку)
+//	drawPhotoInCell(pdf, picture.GetImg(), photoX, currentY, widths[6], rowHeight, fillColor)
+//}
+
+func drawBackgroud(pdf *gofpdf.Fpdf, position Position, parametrs Parametrs, color RGBColor) {
+	// Выбираем цвет для заливки
+	pdf.SetFillColor(color.R, color.G, color.B)
+	// Закрашиваем всю полосу
+	pdf.SetXY(position.X, position.Y)
+	pdf.CellFormat(parametrs.Width, parametrs.Height, "", "0", 0, "C", true, 0, "")
 }

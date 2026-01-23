@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 )
@@ -61,9 +62,9 @@ var tableWidths = []float64{
 
 var tableWidthRecomendation = []float64{
 	10,
-	70,
+	60,
 	30,
-	160,
+	132,
 }
 
 var site string
@@ -1715,4 +1716,27 @@ func createRecomendationsPage(pdf *gofpdf.Fpdf, recomendations []*createpdffile.
 	}
 
 	DrawTableHeader(pdf, tableWidthRecomendation, headers, 16.932)
+
+	rows := make([][]Row, len(recomendations))
+
+	var wg sync.WaitGroup
+	wg.Add(len(recomendations))
+
+	for i, r := range recomendations {
+		i, r := i, r
+		go func() {
+			defer wg.Done()
+
+			rows[i] = []Row{
+				{Width: tableWidthRecomendation[0], Text: strconv.Itoa(i + 1)},
+				{Width: tableWidthRecomendation[1], Text: r.GetName()},
+				{Width: tableWidthRecomendation[2], Text: strconv.Itoa(int(r.GetCount()))},
+				{Width: tableWidthRecomendation[3], Text: r.GetDescription()},
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	addWatermark(pdf)
 }
