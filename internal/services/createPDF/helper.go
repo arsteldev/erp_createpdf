@@ -2,6 +2,7 @@ package createPDF
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/disintegration/imaging"
 	"github.com/jung-kurt/gofpdf"
 	"image/png"
@@ -175,12 +176,7 @@ func DrawTableHeader(pdf *gofpdf.Fpdf, widths []float64, headers []string, heade
 	// Рисуем все ячейки заголовка
 	x := startX
 	for i, header := range headers {
-		align := "C"
-		if i == 1 {
-			align = "L"
-		}
-
-		drawHeaderCell(x, currentY, widths[i], headerHeights, header, align)
+		drawHeaderCell(x, currentY, widths[i], headerHeights, header, "L")
 		x += widths[i]
 	}
 
@@ -309,10 +305,166 @@ func DrawTableHeader(pdf *gofpdf.Fpdf, widths []float64, headers []string, heade
 //	drawPhotoInCell(pdf, picture.GetImg(), photoX, currentY, widths[6], rowHeight, fillColor)
 //}
 
+func DrawTableRows(pdf *gofpdf.Fpdf, rows [][]Row, headerHeight float64) {
+	const (
+		firstPageRows = 3
+		nextPageRows  = 4
+		headerPad     = 0.5
+	)
+
+	firstPage := true
+	rowsOnPage := 0
+
+	// Старт под шапкой + небольшой отступ
+	if pdf.GetY() < headerHeight+headerPad {
+		pdf.SetY(headerHeight + headerPad)
+	}
+
+	for i, row := range rows {
+		limit := nextPageRows
+		if firstPage {
+			limit = firstPageRows
+		}
+
+		// Переход на новую страницу
+		if rowsOnPage >= limit {
+			AddWatermark(pdf)
+			pdf.AddPage()
+
+			firstPage = false
+			rowsOnPage = 0
+
+			// ВАЖНО: на новой странице снова ставим Y под шапку + отступ
+			pdf.SetY(((headerHeight * 2) - 1) + headerPad)
+		}
+
+		// Чередование фона
+		bg := RGBColor{255, 255, 255}
+		//bg := RGBColor{232, 237, 237}
+		if i%2 == 1 {
+			//bg = RGBColor{255, 255, 255}
+			bg = RGBColor{232, 237, 237}
+		}
+
+		// Рисуем строку строго по текущему курсору PDF
+		pos := Position{X: pdf.GetX(), Y: pdf.GetY()}
+		drawRow(pdf, row, pos, bg)
+
+		rowsOnPage++
+	}
+}
+
+// drawRow — рисует одну строку таблицы (фон + ячейки)
+func drawRow(pdf *gofpdf.Fpdf, columns []Row, position Position, color RGBColor) {
+	// Ширина страницы
+	pageWidth, _ := pdf.GetPageSize()
+
+	// Фон строки
+	drawBackgroud(pdf, Position{X: 0, Y: position.Y}, Parametrs{Width: pageWidth, Height: rowHeight}, color)
+
+	// Текст по ячейкам
+	x := position.X
+	y := position.Y
+	pdf.SetXY(x, y)
+
+	for _, c := range columns {
+		pdf.SetXY(x, y)
+		pdf.SetTextColor(0, 0, 0)
+		// ВАЖНО: используйте MultiCell, если возможны переносы по строкам
+		pdf.CellFormat(c.Width, rowHeight, c.Text, "", 0, "L", false, 0, "")
+		x += c.Width
+	}
+
+	// Переход на следующую строку
+	pdf.SetXY(position.X, position.Y+rowHeight)
+}
+
 func drawBackgroud(pdf *gofpdf.Fpdf, position Position, parametrs Parametrs, color RGBColor) {
 	// Выбираем цвет для заливки
 	pdf.SetFillColor(color.R, color.G, color.B)
 	// Закрашиваем всю полосу
 	pdf.SetXY(position.X, position.Y)
 	pdf.CellFormat(parametrs.Width, parametrs.Height, "", "0", 0, "C", true, 0, "")
+}
+
+func AddWatermark(pdf *gofpdf.Fpdf) {
+	currentPage := pdf.PageNo()
+
+	pageWidth, pageHeight := pdf.GetPageSize()
+	forLine := pageHeight - 30
+
+	// Сохраняем всё
+	originalTextColorR, originalTextColorG, originalTextColorB := pdf.GetTextColor()
+	originalFillColorR, originalFillColorG, originalFillColorB := pdf.GetFillColor()
+	originalDrawColorR, originalDrawColorG, originalDrawColorB := pdf.GetDrawColor()
+	originalX := pdf.GetX()
+	originalY := pdf.GetY()
+
+	// Гарантированно восстанавливаем в конце
+	defer func() {
+		pdf.SetTextColor(originalTextColorR, originalTextColorG, originalTextColorB)
+		pdf.SetFillColor(originalFillColorR, originalFillColorG, originalFillColorB)
+		pdf.SetDrawColor(originalDrawColorR, originalDrawColorG, originalDrawColorB)
+		pdf.SetXY(originalX, originalY)
+	}()
+
+	// Константы для отступов
+	const (
+		leftMargin  = 32.0
+		rightMargin = 32.0
+		lineY       = -3.0 // Относительное положение текста от линии
+		logoYOffset = 5.0  // Отступ лого от линии
+	)
+
+	// Рисуем линию от левого отступа до правого
+	pdf.SetDrawColor(255, 89, 3)
+	pdf.Line(leftMargin, forLine, pageWidth-rightMargin, forLine)
+
+	// Устанавливаем настройки для вотермарки
+	pdf.SetFont("Inter", "", 10.5)
+
+	// Форматируем номер страницы
+	currentPageS := fmt.Sprintf("%02d", currentPage)
+
+	// Четная/нечетная страница
+	if currentPage%2 == 1 {
+		// Нечетная страница
+
+		// 1. Номер страницы справа (у правого края)
+		pdf.SetTextColor(255, 89, 3)
+		pageNumX := pageWidth - rightMargin
+		pdf.SetXY(pageNumX, forLine+lineY)
+		pdf.CellFormat(0, 20, currentPageS, "", 0, "R", false, 0, "")
+
+		// 2. Сайт слева от номера страницы (отступ 50 пунктов)
+		pdf.SetTextColor(17, 22, 25)
+		//siteX := pageNumX - 50
+		siteX := pageNumX - 30
+		pdf.SetXY(siteX, forLine+lineY)
+		pdf.CellFormat(0, 20, site, "", 0, "L", false, 0, "")
+
+		// 3. Лого слева (у левого края)
+		if pdf.GetImageInfo("leftImageIntoWaterMark") != nil {
+			pdf.Image("leftImageIntoWaterMark", leftMargin, forLine+logoYOffset, 30, 7, false, "", 0, "")
+		}
+	} else {
+		// Четная страница
+
+		// 1. Номер страницы слева (у левого края)
+		pdf.SetTextColor(255, 89, 3)
+		pdf.SetXY(leftMargin, forLine+lineY)
+		pdf.CellFormat(0, 20, currentPageS, "", 0, "L", false, 0, "")
+
+		// 2. Сайт справа от номера страницы
+		pdf.SetTextColor(17, 22, 25)
+		//siteX := leftMargin + 25 // Отступ от номера страницы
+		siteX := leftMargin + 25 // Отступ от номера страницы
+		pdf.SetXY(siteX, forLine+lineY)
+		pdf.CellFormat(0, 20, site, "", 0, "L", false, 0, "")
+
+		// 3. Лого справа (у правого края)
+		if pdf.GetImageInfo("rightImageIntoWaterMark") != nil {
+			pdf.Image("rightImageIntoWaterMark", pageWidth-rightMargin-30, forLine+logoYOffset, 30, 5, false, "", 0, "")
+		}
+	}
 }

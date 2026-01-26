@@ -395,7 +395,7 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 	createTableOfContents(pdf, links["tabelModel"].Page, links["characteristics"].Page, links, order)
 
 	// Добавляем вотермарку на страницу содержания
-	addWatermark(pdf)
+	AddWatermark(pdf)
 
 	// 8. ВАЖНО: Возвращаемся на последнюю страницу
 	pdf.SetPage(currentPageBeforeUpdate)
@@ -450,7 +450,7 @@ func createCoverPage(pdf *gofpdf.Fpdf, firstPage *createpdffile.FirstPage) {
 	// 4. Картинка, которая стоит в по центру 1 страницы
 	SetImageIntoPDF(pdf, firstPage.GetMainPageImage(), pageWidth-120, pageHeight-130, 110, 50, "mainPageLogo", false)
 
-	// Картинки, которые я буду использовать в addWaterMark легче было загрузить сразу, а потом только использовать по их имени.
+	// Картинки, которые я буду использовать в AddWatermark легче было загрузить сразу, а потом только использовать по их имени.
 	// Именно поэтому они и 1 и 1 и -10, -10
 	SetImageIntoPDF(pdf, firstPage.GetSmallCoCompanyImage(), -10, -10, 1, 1, "leftImageIntoWaterMark", false)
 	SetImageIntoPDF(pdf, firstPage.GetCompanySmall(), -10, -10, 1, 1, "rightImageIntoWaterMark", false)
@@ -625,7 +625,7 @@ func createTableOfContents(pdf *gofpdf.Fpdf, tableStartPage, characteristicsPage
 	//addTOCItem("Характеристики системы", characteristicsPage, charLinkID)
 
 	if links["characteristics"].Page == 0 {
-		addWatermark(pdf)
+		AddWatermark(pdf)
 	}
 }
 
@@ -650,7 +650,7 @@ func createModelTable(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 	// ПЕРВАЯ СТРАНИЦА
 	setSpecificationEquipment(pdf, 2, number)
 	pdf.SetY(50)
-	addWatermark(pdf)
+	AddWatermark(pdf)
 	drawTableHeaderForLandscape(pdf, tableWidths, 16.932)
 
 	pdf.SetDrawColor(180, 180, 180)
@@ -683,7 +683,7 @@ func createModelTable(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 		pdf.AddPage()
 		tablePageNumber++
 		// Только шапка на странице с итогами
-		addWatermark(pdf)
+		AddWatermark(pdf)
 		pdf.SetY(20)
 		drawTableHeaderForLandscape(pdf, tableWidths, 14.11)
 		createSumm(pdf, amount, true, needRub, needText)
@@ -701,7 +701,7 @@ func createModelTable(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 			tablePageNumber++
 			pdf.SetY(17)
 			drawTableHeaderForLandscape(pdf, tableWidths, 14.11)
-			addWatermark(pdf)
+			AddWatermark(pdf)
 		}
 
 		rowColor := getRowColor(modelsOnCurrentPage)
@@ -721,7 +721,7 @@ func createModelTable(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 				tablePageNumber++
 				pdf.SetY(20)
 				drawTableHeaderForLandscape(pdf, tableWidths, 14.11)
-				addWatermark(pdf)
+				AddWatermark(pdf)
 			}
 			modelsOnCurrentPage = 0
 		}
@@ -1057,89 +1057,6 @@ func drawPhotoInCell(pdf *gofpdf.Fpdf, imagePath string, x, y, cellWidth, cellHe
 	pdf.Line(photoX+imageSize-2, photoY+2, photoX+2, photoY+imageSize-2)
 }
 
-// Функция для добавления подложки (логотипа) на страницы
-func addWatermark(pdf *gofpdf.Fpdf) {
-	currentPage := pdf.PageNo()
-
-	pageWidth, pageHeight := pdf.GetPageSize()
-	forLine := pageHeight - 30
-
-	// Сохраняем всё
-	originalTextColorR, originalTextColorG, originalTextColorB := pdf.GetTextColor()
-	originalFillColorR, originalFillColorG, originalFillColorB := pdf.GetFillColor()
-	originalDrawColorR, originalDrawColorG, originalDrawColorB := pdf.GetDrawColor()
-	originalX := pdf.GetX()
-	originalY := pdf.GetY()
-
-	// Гарантированно восстанавливаем в конце
-	defer func() {
-		pdf.SetTextColor(originalTextColorR, originalTextColorG, originalTextColorB)
-		pdf.SetFillColor(originalFillColorR, originalFillColorG, originalFillColorB)
-		pdf.SetDrawColor(originalDrawColorR, originalDrawColorG, originalDrawColorB)
-		pdf.SetXY(originalX, originalY)
-	}()
-
-	// Константы для отступов
-	const (
-		leftMargin  = 32.0
-		rightMargin = 32.0
-		lineY       = -3.0 // Относительное положение текста от линии
-		logoYOffset = 5.0  // Отступ лого от линии
-	)
-
-	// Рисуем линию от левого отступа до правого
-	pdf.SetDrawColor(255, 89, 3)
-	pdf.Line(leftMargin, forLine, pageWidth-rightMargin, forLine)
-
-	// Устанавливаем настройки для вотермарки
-	pdf.SetFont("Inter", "", 10.5)
-
-	// Форматируем номер страницы
-	currentPageS := fmt.Sprintf("%02d", currentPage)
-
-	// Четная/нечетная страница
-	if currentPage%2 == 1 {
-		// Четная страница
-
-		// 1. Номер страницы справа (у правого края)
-		pdf.SetTextColor(255, 89, 3)
-		pageNumX := pageWidth - rightMargin
-		pdf.SetXY(pageNumX, forLine+lineY)
-		pdf.CellFormat(0, 20, currentPageS, "", 0, "R", false, 0, "")
-
-		// 2. Сайт слева от номера страницы (отступ 50 пунктов)
-		pdf.SetTextColor(17, 22, 25)
-		//siteX := pageNumX - 50
-		siteX := pageNumX - 30
-		pdf.SetXY(siteX, forLine+lineY)
-		pdf.CellFormat(0, 20, site, "", 0, "L", false, 0, "")
-
-		// 3. Лого слева (у левого края)
-		if pdf.GetImageInfo("leftImageIntoWaterMark") != nil {
-			pdf.Image("leftImageIntoWaterMark", leftMargin, forLine+logoYOffset, 30, 7, false, "", 0, "")
-		}
-	} else {
-		// Нечетная страница
-
-		// 1. Номер страницы слева (у левого края)
-		pdf.SetTextColor(255, 89, 3)
-		pdf.SetXY(leftMargin, forLine+lineY)
-		pdf.CellFormat(0, 20, currentPageS, "", 0, "L", false, 0, "")
-
-		// 2. Сайт справа от номера страницы
-		pdf.SetTextColor(17, 22, 25)
-		//siteX := leftMargin + 25 // Отступ от номера страницы
-		siteX := leftMargin + 20 // Отступ от номера страницы
-		pdf.SetXY(siteX, forLine+lineY)
-		pdf.CellFormat(0, 20, site, "", 0, "L", false, 0, "")
-
-		// 3. Лого справа (у правого края)
-		if pdf.GetImageInfo("rightImageIntoWaterMark") != nil {
-			pdf.Image("rightImageIntoWaterMark", pageWidth-rightMargin-30, forLine+logoYOffset, 30, 5, false, "", 0, "")
-		}
-	}
-}
-
 // Страница заключения
 func createConclusionPage(pdf *gofpdf.Fpdf) {
 	// Очищаем текущую страницу
@@ -1310,7 +1227,7 @@ func createCharacteristic(pdf *gofpdf.Fpdf, additionallyEquipment []*createpdffi
 
 	endPage = pdf.PageNo()
 
-	addWatermark(pdf)
+	AddWatermark(pdf)
 	return endPage - startPage
 }
 
@@ -1435,7 +1352,7 @@ func createSystemFeatures(pdf *gofpdf.Fpdf, features []*createpdffile.SystemFeat
 
 	drawNumberedListWordLike(pdf, items, leftPad, rightPad, startY)
 
-	addWatermark(pdf)
+	AddWatermark(pdf)
 }
 
 // drawNumberedListWordLike печатает нумерованный список в стиле Word:
@@ -1676,11 +1593,11 @@ func imageEquipments(pdf *gofpdf.Fpdf, picture []byte, name, nameImage string, n
 	// 30 -- Высота для waterMark
 	SetImageIntoPDF(pdf, picture, float64(positionX), float64(positionY), 233, pageHeight-30-float64(positionY)-10, nameImage, true)
 
-	addWatermark(pdf)
+	AddWatermark(pdf)
 }
 
 func createRecomendationsPage(pdf *gofpdf.Fpdf, recomendations []*createpdffile.Recomendations, number, subNumber int) {
-	defer addWatermark(pdf)
+	defer AddWatermark(pdf)
 
 	positionX := 32
 	pdf.SetLeftMargin(float64(positionX))
@@ -1738,5 +1655,7 @@ func createRecomendationsPage(pdf *gofpdf.Fpdf, recomendations []*createpdffile.
 
 	wg.Wait()
 
-	addWatermark(pdf)
+	DrawTableRows(pdf, rows, 16.932)
+
+	AddWatermark(pdf)
 }
