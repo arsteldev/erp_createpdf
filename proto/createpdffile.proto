@@ -9,7 +9,7 @@ message Models {
   string short_note = 2;
   uint32 count = 3;
   string presence = 4;
-  string img = 5;
+  bytes img = 5;
   float money_one = 6;
   float money_count = 7;
   string icon = 8;

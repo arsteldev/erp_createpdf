@@ -38,7 +38,8 @@ type LinkItem struct {
 // Константы для таблицы моделей
 const (
 	rowHeight           = 36.686
-	imageSize           = 25.0
+	imageSize           = 20.0
+	imageSizeWidth      = 55
 	maxModelsFirstPage  = 3
 	maxModelsOtherPages = 4
 	math                = (25.4 / 72.0)
@@ -209,11 +210,13 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		links[key] = item
 	}
 
+	number := 0
 	// Добавляем один элемент
 	if len(req.GetFeatures()) != 0 {
+		number++
 		addLink("features", LinkItem{
 			ShortName: "features",
-			Name:      "Особенности системы и требования заказчика",
+			Name:      strconv.Itoa(number) + ". " + "Особенности системы и требования заказчика",
 			ID:        pdf.AddLink(),
 			Page:      0,
 			Main:      true,
@@ -221,9 +224,10 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 	}
 
 	if req.GetSelectequipment().GetTextEquipment() != "" && len(req.GetSelectequipment().GetSchema()) > 0 && len(req.GetSelectequipment().GetAccommodation()) > 0 {
+		number++
 		addLink("selectsEquipments", LinkItem{
 			ShortName: "selectsEquipments",
-			Name:      "Выбор оборудования",
+			Name:      strconv.Itoa(number) + ". " + "Выбор оборудования",
 			ID:        pdf.AddLink(),
 			Page:      0,
 			Main:      true,
@@ -231,7 +235,7 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 
 		addLink("schemaEquipments", LinkItem{
 			ShortName: "schemaEquipments",
-			Name:      "Структурная схема проекта",
+			Name:      strconv.Itoa(number) + ".1 " + "Структурная схема проекта",
 			ID:        pdf.AddLink(),
 			Page:      0,
 			Main:      false,
@@ -239,7 +243,7 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 
 		addLink("accommodationEquipments", LinkItem{
 			ShortName: "accommodationEquipments",
-			Name:      "Размещение блоков системы в шкафах",
+			Name:      strconv.Itoa(number) + ".2 " + "Размещение блоков системы в шкафах",
 			ID:        pdf.AddLink(),
 			Page:      0,
 			Main:      false,
@@ -247,18 +251,21 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 	}
 
 	// Добавляем группу элементов (исправлен синтаксис []LinkItem{...}...)
+	number++
 	addLink("tabelModel", LinkItem{
 		ShortName: "tabelModel",
-		Name:      "Спецификация оборудования",
+		Name:      strconv.Itoa(number) + ". " + "Спецификация оборудования",
 		ID:        pdf.AddLink(),
 		Page:      0,
 		Main:      true,
 	})
 
+	subNumber := 0
 	if len(req.GetRecomendations()) != 0 {
+		subNumber++
 		addLink("recomendations", LinkItem{
 			ShortName: "recomendations",
-			Name:      "Рекомендации по дополнительному оборудованию системы",
+			Name:      strconv.Itoa(number) + "." + strconv.Itoa(subNumber) + " " + "Рекомендации по дополнительному оборудованию системы",
 			ID:        pdf.AddLink(),
 			Page:      0,
 			Main:      false,
@@ -267,9 +274,10 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 
 	s.Log.Info("Количество рекоммендаий:" + strconv.Itoa(len(req.GetRecomendations())))
 
+	subNumber++
 	addLink("characteristics", LinkItem{
 		ShortName: "characteristics",
-		Name:      "Характеристики системы",
+		Name:      strconv.Itoa(number) + "." + strconv.Itoa(subNumber) + " " + "Характеристики системы",
 		ID:        pdf.AddLink(),
 		Page:      0,
 		Main:      false,
@@ -285,9 +293,7 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 
 	// 4. Запоминаем текущую страницу (содержание)
 	tocPageNum := pdf.PageNo()
-
-	number := 0
-
+	number = 0
 	if len(req.GetFeatures()) != 0 {
 		pdf.AddPage()
 		tempLink := links["features"]
@@ -350,7 +356,7 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 	number++
 	_ = createModelTable(pdf, req.GetModels(), req.GetAmount(), number)
 
-	subNumber := 0
+	subNumber = 0
 	if len(req.GetRecomendations()) != 0 {
 		pdf.AddPage()
 		tempLink = links["recomendations"]
@@ -1020,10 +1026,10 @@ func drawTableRow(pdf *gofpdf.Fpdf, index int, picture *createpdffile.Models, wi
 	pdf.CellFormat(widths[6], rowHeight, "", "1", 1, "C", true, 0, "")
 
 	// Рисуем фото (или заглушку)
-	drawPhotoInCell(pdf, picture.GetImg(), photoX, currentY, widths[6], rowHeight, fillColor)
+	drawPhotoInCell(pdf, picture.GetImg(), photoX, currentY, widths[6], rowHeight, picture.GetName())
 }
 
-func drawPhotoInCell(pdf *gofpdf.Fpdf, imagePath string, x, y, cellWidth, cellHeight float64, bgColor RGBColor) {
+func drawPhotoInCell(pdf *gofpdf.Fpdf, imagePath []byte, x, y, cellWidth, cellHeight float64, name string) {
 	// Маленькое фото
 	photoX := x + (cellWidth-imageSize)/2
 	photoY := y + (cellHeight-imageSize)/2
@@ -1038,61 +1044,28 @@ func drawPhotoInCell(pdf *gofpdf.Fpdf, imagePath string, x, y, cellWidth, cellHe
 	//	}
 	//}
 
-	if imagePath != "" {
-		if _, err := os.Stat(imagePath); err == nil {
-			if name, ok := registerFromFileSmart(pdf, "modelPhoto", imagePath); ok {
-				pdf.Image(name, photoX, photoY, imageSize, imageSize, false, "", 0, "")
-				return
-			}
-		}
-	}
-
-	// Серый квадрат если нет фото
-	pdf.SetDrawColor(200, 200, 200)
-	pdf.SetLineWidth(0.5)
-	pdf.Rect(photoX, photoY, imageSize, imageSize, "D")
-
-	// Крестик
-	pdf.Line(photoX+2, photoY+2, photoX+imageSize-2, photoY+imageSize-2)
-	pdf.Line(photoX+imageSize-2, photoY+2, photoX+2, photoY+imageSize-2)
+	SetImageIntoPDF(pdf, imagePath, photoX-10, photoY, imageSizeWidth, imageSize, name, false)
+	//
+	//if string(imagePath) != "" {
+	//	if _, err := os.Stat(string(imagePath)); err == nil {
+	//		SetImageIntoPDF(pdf, imagePath, photoX, photoY, imageSize, imageSize, name, false)
+	//		return
+	//		//if name, ok := registerFromFileSmart(pdf, "modelPhoto", name); ok {
+	//		//	//pdf.Image(name, photoX, photoY, imageSize, imageSize, false, "", 0, "")
+	//		//	return
+	//		//}
+	//	}
+	//}
+	//
+	//// Серый квадрат если нет фото
+	//pdf.SetDrawColor(200, 200, 200)
+	//pdf.SetLineWidth(0.5)
+	//pdf.Rect(photoX, photoY, imageSize, imageSize, "D")
+	//
+	//// Крестик
+	//pdf.Line(photoX+2, photoY+2, photoX+imageSize-2, photoY+imageSize-2)
+	//pdf.Line(photoX+imageSize-2, photoY+2, photoX+2, photoY+imageSize-2)
 }
-
-// Страница заключения
-func createConclusionPage(pdf *gofpdf.Fpdf) {
-	// Очищаем текущую страницу
-	pdf.SetY(50)
-
-	// Заголовок
-	pdf.SetFont("montserrat", "B", 24)
-	pdf.SetTextColor(0, 0, 0)
-	pdf.CellFormat(0, 20, "Заключение", "", 1, "C", false, 0, "")
-
-	pdf.Ln(20)
-
-	// Текст заключения
-	pdf.SetFont("montserrat", "", 14)
-	pdf.SetTextColor(0, 0, 0)
-
-	text := "Настоящий отчет содержит информацию о всех моделях, находящихся в базе данных. " +
-		"Каждая модель представлена с фотографией, техническими характеристиками и статусом наличия. " +
-		"Отчет был сгенерирован автоматически и содержит актуальную информацию на момент создания."
-
-	// Используем MultiCell для правильного переноса текста
-	pdf.SetX(20)
-	pdf.MultiCell(257, 10, text, "", "L", false)
-
-	pdf.Ln(30)
-
-	// Благодарность
-	pdf.SetFont("montserrat", "I", 12)
-	pdf.SetX(0)
-	pdf.CellFormat(0, 10, "Благодарим за использование нашего сервиса!", "", 1, "C", false, 0, "")
-}
-
-//func setDefaultBackground(pdf *gofpdf.Fpdf) {
-//	pdf.SetFillColor(41, 128, 185)
-//	pdf.Rect(0, 0, 297, 210, "F")
-//}
 
 func setSpecificationEquipment(pdf *gofpdf.Fpdf, idCompany, number int) {
 	switch idCompany {
@@ -1121,48 +1094,6 @@ func setSpecificationEquipment(pdf *gofpdf.Fpdf, idCompany, number int) {
 		break
 	}
 }
-
-//func setImageIntoPDF(pdf *gofpdf.Fpdf, imageData []byte, positionX, positionY, width, height float64, nameImage string, withDefault bool) {
-//	if len(imageData) == 0 {
-//		if withDefault {
-//			setDefaultBackground(pdf)
-//		}
-//		return
-//	}
-//
-//	// Пытаемся определить тип изображения
-//	imageType := getImageType(imageData)
-//
-//	// Если тип PNG или не определен (возможно PNG 16-bit), пробуем конвертировать
-//	if imageType == "" || imageType == "png" || imageType == "PNG" {
-//		if convertedData, err := convertPNG16to8(imageData); err == nil && len(convertedData) > 0 {
-//			// Проверяем, что конвертация дала валидный PNG
-//			if newType := getImageType(convertedData); newType == "png" {
-//				imageData = convertedData
-//				imageType = "png"
-//			}
-//		}
-//	}
-//
-//	// Если тип все еще не определен
-//	if imageType == "" {
-//		if withDefault {
-//			setDefaultBackground(pdf)
-//		}
-//		return
-//	}
-//
-//	reader := bytes.NewReader(imageData)
-//	imgInfo := pdf.RegisterImageReader(nameImage, imageType, reader)
-//	if imgInfo == nil {
-//		if withDefault {
-//			setDefaultBackground(pdf)
-//		}
-//		return
-//	}
-//
-//	pdf.Image(nameImage, positionX, positionY, width, height, false, "", 0, "")
-//}
 
 func createCharacteristic(pdf *gofpdf.Fpdf, additionallyEquipment []*createpdffile.Models, characteristicData *createpdffile.ModelsData, number, subNumber int) int {
 	startPage := pdf.PageNo()
@@ -1582,9 +1513,15 @@ func imageEquipments(pdf *gofpdf.Fpdf, picture []byte, name, nameImage string, n
 		CellString{w: 0, h: 24 * math, txtStr: strconv.Itoa(number) + "." + strconv.Itoa(subNumber), borderStr: "", ln: 0, alignStr: "L", fill: false, link: 0, linkStr: ""},
 	)
 
+	runes := []rune(name)
+	var result string
+	if len(runes) > 4 {
+		result = string(runes[4:])
+	}
+
 	TextCellFormat(pdf, RGBColor{R: 37, G: 36, B: 36}, font,
 		Position{X: float64(positionX + 2), Y: 17},
-		CellString{w: 0, h: 24 * math, txtStr: strings.Repeat(" ", 5) + name, borderStr: "", ln: 0, alignStr: "L", fill: false, link: 0, linkStr: ""},
+		CellString{w: 0, h: 24 * math, txtStr: strings.Repeat(" ", 5) + result, borderStr: "", ln: 0, alignStr: "L", fill: false, link: 0, linkStr: ""},
 	)
 
 	_, pageHeight := pdf.GetPageSize()

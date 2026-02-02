@@ -439,7 +439,7 @@ func AddWatermark(pdf *gofpdf.Fpdf) {
 		// 2. Сайт слева от номера страницы (отступ 50 пунктов)
 		pdf.SetTextColor(17, 22, 25)
 		//siteX := pageNumX - 50
-		siteX := pageNumX - 30
+		siteX := pageNumX - 40
 		pdf.SetXY(siteX, forLine+lineY)
 		pdf.CellFormat(0, 20, site, "", 0, "L", false, 0, "")
 
