@@ -468,3 +468,27 @@ func AddWatermark(pdf *gofpdf.Fpdf) {
 		}
 	}
 }
+
+func CreatePageSpecials(pdf *gofpdf.Fpdf) {
+	pageWidth, pageHeight := pdf.GetPageSize()
+	pdf.Image("coverBackground", 0, 0, pageWidth, pageHeight, false, "", 0, "")
+	pdf.Image("companyLogo", 34, 17, 60, 15, false, "", 0, "")
+	pdf.Image("smallLogo", pageWidth-64, 19, 32, 9, false, "", 0, "")
+	pdf.Image("mainPageLogo", pageWidth-120, pageHeight-130, 110, 50, false, "", 0, "")
+
+	Text(
+		pdf,
+		RGBColor{R: 37, G: 36, B: 36},
+		Font{font: "montserrat", style: "M", size: 34},
+		Position{X: -1, Y: 47},
+		MultiCellString{w: 0, h: 38 * math, txtStr: "ОПИСАНИЕ\nОБОРУДОВАНИЯ", borderStr: "", alignStr: "L", fill: false},
+	)
+
+	Text(
+		pdf,
+		RGBColor{R: 37, G: 36, B: 36},
+		Font{font: "montserrat", style: "M", size: 14},
+		Position{X: -1, Y: 87},
+		MultiCellString{w: 0, h: 10.8 * math, txtStr: "Приложение к коммерческому\nпредложению", borderStr: "", alignStr: "L", fill: false},
+	)
+}

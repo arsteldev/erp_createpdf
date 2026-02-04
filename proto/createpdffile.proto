@@ -4,6 +4,10 @@ package createpdffile;
 
 option go_package = './createpdffile';
 
+message ModelSpecials {
+  string special = 1;
+}
+
 message Models {
   string name = 1;
   string short_note = 2;
@@ -13,6 +17,8 @@ message Models {
   float money_one = 6;
   float money_count = 7;
   string icon = 8;
+  string description = 9;
+  repeated ModelSpecials specials = 10;
 }
 
 message ContactUser {
@@ -88,6 +94,7 @@ message CreatePDFRequest {
   repeated SystemFeatures features = 5;
   SelectEquipment Selectequipment = 6;
   repeated Recomendations recomendations = 7;
+  bool specials = 8;
 }
 
 

@@ -4,7 +4,7 @@
 // - protoc             v5.26.1
 // source: createpdffile.proto
 
-package createpdffile
+package proto
 
 import (
 	context "context"

@@ -283,6 +283,26 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		Main:      false,
 	})
 
+	if req.GetSpecials() {
+		addLink("specials_main", LinkItem{
+			ShortName: "specials_main",
+			Name:      "ПРИЛОЖЕНИЕ. ОПИСАНИЕ ОБОРУДОВАНИЯ",
+			ID:        pdf.AddLink(),
+			Page:      0,
+			Main:      true,
+		})
+
+		//for _, model := range req.GetModels() {
+		//	addLink("specials_"+model.Name, LinkItem{
+		//		ShortName: "specials_" + model.Name,
+		//		Name:      model.Name + model.ShortNote,
+		//		ID:        pdf.AddLink(),
+		//		Page:      0,
+		//		Main:      false,
+		//	})
+		//}
+	}
+
 	//specLink := pdf.AddLink() // Ссылка на спецификацию оборудования
 	//charLink := pdf.AddLink() // Ссылка на характеристики системы
 
@@ -382,6 +402,36 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 	subNumber++
 	_ = createCharacteristic(pdf, req.GetModels(), req.GetModelsdata(), number, subNumber)
 
+	if req.GetSpecials() {
+		pdf.AddPage()
+		tempLink = links["specials_main"]
+		tempLink.Page = pdf.PageNo()
+		links["specials_main"] = tempLink
+
+		pdf.SetLink(links["specials_main"].ID, 0, links["specials_main"].Page)
+
+		CreatePageSpecials(pdf)
+		//subNumber++
+		//createRecomendationsPage(pdf, req.GetRecomendations(), number, subNumber)
+		//addLink("specials_main", LinkItem{
+		//	ShortName: "specials_main",
+		//	Name:      "ПРИЛОЖЕНИЕ. ОПИСАНИЕ ОБОРУДОВАНИЯ",
+		//	ID:        pdf.AddLink(),
+		//	Page:      0,
+		//	Main:      true,
+		//})
+		//
+		//for _, model := range req.GetModels() {
+		//	addLink("specials_"+model.Name, LinkItem{
+		//		ShortName: "specials_" + model.Name,
+		//		Name:      model.Name + model.ShortNote,
+		//		ID:        pdf.AddLink(),
+		//		Page:      0,
+		//		Main:      false,
+		//	})
+		//}
+	}
+
 	// 7. ВОЗВРАЩАЕМСЯ на страницу содержания для обновления номеров
 	currentPageBeforeUpdate := pdf.PageNo() // Сохраняем текущую страницу
 	pdf.SetPage(tocPageNum)                 // Переходим на страницу содержания
@@ -453,7 +503,7 @@ func createCoverPage(pdf *gofpdf.Fpdf, firstPage *createpdffile.FirstPage) {
 	// 3. Малый логотип в правом углу (smallCoCompanyImage)
 	SetImageIntoPDF(pdf, firstPage.GetSmallCoCompanyImage(), pageWidth-64, 19, 32, 9, "smallLogo", false)
 
-	// 4. Картинка, которая стоит в по центру 1 страницы
+	// 4. Картинка, которая стоит по центру 1 страницы
 	SetImageIntoPDF(pdf, firstPage.GetMainPageImage(), pageWidth-120, pageHeight-130, 110, 50, "mainPageLogo", false)
 
 	// Картинки, которые я буду использовать в AddWatermark легче было загрузить сразу, а потом только использовать по их имени.
@@ -1497,6 +1547,8 @@ func selectsEquipments(pdf *gofpdf.Fpdf, text string, number int) {
 	// Правая колонка (с той же высоты startY)
 	pdf.SetXY(rightX, startY)
 	pdf.MultiCell(colW, lineH, rightText, "", "J", false)
+
+	AddWatermark(pdf)
 }
 
 func imageEquipments(pdf *gofpdf.Fpdf, picture []byte, name, nameImage string, number, subNumber int) {
