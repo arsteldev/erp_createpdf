@@ -42,7 +42,7 @@ const (
 	imageSizeWidth      = 55
 	maxModelsFirstPage  = 3
 	maxModelsOtherPages = 4
-	math                = (25.4 / 72.0)
+	math                = 25.4 / 72.0
 )
 
 type PowerData struct {
@@ -196,11 +196,17 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 	pdf.SetTitle("Отчет по моделям", true)
 
 	site = req.GetFirstpage().GetContacts().GetSite()
-	pdf.SetLeftMargin(32)
-	pdf.SetRightMargin(32)
 
 	// 1. Титульная страница
-	createCoverPage(pdf, req.GetFirstpage())
+	if req.Firstpage.IdCompany == 2 {
+		pdf.SetLeftMargin(32)
+		pdf.SetRightMargin(32)
+		createCoverPage(pdf, req.GetFirstpage())
+	} else {
+		pdf.SetLeftMargin(21.76)
+		//pdf.SetRightMargin(32)
+		CreateCoverPageRondo(pdf, req.GetFirstpage())
+	}
 
 	// 2. Создаем ссылки ДО создания содержания
 	links := make(map[string]LinkItem)
@@ -222,6 +228,10 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 			Main:      true,
 		})
 	}
+
+	/**
+	  НАЧАЛО ТУТ
+	*/
 
 	if req.GetSelectequipment().GetTextEquipment() != "" && len(req.GetSelectequipment().GetSchema()) > 0 && len(req.GetSelectequipment().GetAccommodation()) > 0 {
 		number++
@@ -284,23 +294,35 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 	})
 
 	if req.GetSpecials() {
-		addLink("specials_main", LinkItem{
-			ShortName: "specials_main",
-			Name:      "ПРИЛОЖЕНИЕ. ОПИСАНИЕ ОБОРУДОВАНИЯ",
-			ID:        pdf.AddLink(),
-			Page:      0,
-			Main:      true,
-		})
+		if req.Firstpage.IdCompany == 2 {
+			addLink("specials_main", LinkItem{
+				ShortName: "specials_main",
+				Name:      "ПРИЛОЖЕНИЕ. ОПИСАНИЕ ОБОРУДОВАНИЯ",
+				ID:        pdf.AddLink(),
+				Page:      0,
+				Main:      true,
+			})
 
-		//for _, model := range req.GetModels() {
-		//	addLink("specials_"+model.Name, LinkItem{
-		//		ShortName: "specials_" + model.Name,
-		//		Name:      model.Name + model.ShortNote,
-		//		ID:        pdf.AddLink(),
-		//		Page:      0,
-		//		Main:      false,
-		//	})
-		//}
+			for _, model := range req.GetModels() {
+				nameLowerCase := strings.ToLower(model.Name)
+				addLink("specials_"+nameLowerCase, LinkItem{
+					ShortName: "specials_" + nameLowerCase,
+					Name:      model.Name,
+					ID:        pdf.AddLink(),
+					Page:      0,
+					Main:      false,
+				})
+			}
+		} else {
+			number++
+			addLink("specials_main", LinkItem{
+				ShortName: "specials_main",
+				Name:      strconv.Itoa(number) + ". " + "Описание оборудования",
+				ID:        pdf.AddLink(),
+				Page:      0,
+				Main:      true,
+			})
+		}
 	}
 
 	//specLink := pdf.AddLink() // Ссылка на спецификацию оборудования
@@ -309,7 +331,13 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 	// 3. Добавляем страницу содержания (пока без номеров)
 	pdf.AddPage()
 	// Передаем 0 как номера страниц, но уже передаем ID ссылок
-	createTableOfContents(pdf, 0, 0, links, order)
+	if req.Firstpage.IdCompany == 2 {
+		s.Log.Warn("Побывал тут" + strconv.Itoa(int(req.Firstpage.IdCompany)))
+		createTableOfContents(pdf, 0, 0, links, order)
+	} else {
+		s.Log.Warn("Побывал тут в Рондо" + strconv.Itoa(int(req.Firstpage.IdCompany)))
+		CreateTableOfContentsRondo(pdf, 0, 0, links, order)
+	}
 
 	// 4. Запоминаем текущую страницу (содержание)
 	tocPageNum := pdf.PageNo()
@@ -322,7 +350,11 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 
 		pdf.SetLink(links["features"].ID, 0, links["features"].Page)
 		number++
-		createSystemFeatures(pdf, req.GetFeatures(), number)
+		if req.GetFirstpage().IdCompany == 2 {
+			createSystemFeatures(pdf, req.GetFeatures(), number)
+		} else {
+			CreateSystemFeaturesRondo(pdf, req.GetFeatures(), number)
+		}
 	}
 
 	if req.GetSelectequipment().GetTextEquipment() != "" && len(req.GetSelectequipment().GetSchema()) > 0 && len(req.GetSelectequipment().GetAccommodation()) > 0 {
@@ -333,7 +365,11 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 
 		pdf.SetLink(links["selectsEquipments"].ID, 0, links["selectsEquipments"].Page)
 		number++
-		selectsEquipments(pdf, req.GetSelectequipment().GetTextEquipment(), number)
+		if req.Firstpage.IdCompany == 2 {
+			selectsEquipments(pdf, req.GetSelectequipment().GetTextEquipment(), number)
+		} else {
+			SelectsEquipmentsRondo(pdf, req.GetSelectequipment().GetTextEquipment(), number)
+		}
 
 		pdf.AddPage()
 		tempLink = links["schemaEquipments"]
@@ -341,25 +377,23 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		links["schemaEquipments"] = tempLink
 
 		pdf.SetLink(links["schemaEquipments"].ID, 0, links["schemaEquipments"].Page)
-		imageEquipments(pdf, req.GetSelectequipment().GetSchema(), links["schemaEquipments"].Name, "schema", number, 1)
+		if req.Firstpage.IdCompany == 2 {
+			imageEquipments(pdf, req.GetSelectequipment().GetSchema(), links["schemaEquipments"].Name, "schema", number, 1)
+		} else {
+			ImageEquipmentsRondo(pdf, req.GetSelectequipment().GetSchema(), links["schemaEquipments"].Name, "schema", strconv.Itoa(number), "1")
+		}
 
-		/**
-		addLink("accommodationEquipments", LinkItem{
-			ShortName: "accommodationEquipments",
-			Name:      "Размещение блоков системы в шкафах",
-			ID:        pdf.AddLink(),
-			Page:      0,
-			Main:      false,
-		})
-		*/
 		pdf.AddPage()
 		tempLink = links["accommodationEquipments"]
 		tempLink.Page = pdf.PageNo()
 		links["accommodationEquipments"] = tempLink
 
 		pdf.SetLink(links["accommodationEquipments"].ID, 0, links["accommodationEquipments"].Page)
-		imageEquipments(pdf, req.GetSelectequipment().GetAccommodation(), links["accommodationEquipments"].Name, "accommodation", number, 2)
-
+		if req.Firstpage.IdCompany == 2 {
+			imageEquipments(pdf, req.GetSelectequipment().GetAccommodation(), links["accommodationEquipments"].Name, "accommodation", number, 2)
+		} else {
+			ImageEquipmentsRondo(pdf, req.GetSelectequipment().GetAccommodation(), links["accommodationEquipments"].Name, "accommodation", strconv.Itoa(number), "2")
+		}
 	}
 
 	// 5. Создаем таблицу моделей (Спецификация оборудования)
@@ -374,63 +408,78 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 
 	// Создаем таблицу
 	number++
-	_ = createModelTable(pdf, req.GetModels(), req.GetAmount(), number)
-
-	subNumber = 0
-	if len(req.GetRecomendations()) != 0 {
-		pdf.AddPage()
-		tempLink = links["recomendations"]
-		tempLink.Page = pdf.PageNo()
-		links["recomendations"] = tempLink
-
-		pdf.SetLink(links["recomendations"].ID, 0, links["recomendations"].Page)
-
-		subNumber++
-		createRecomendationsPage(pdf, req.GetRecomendations(), number, subNumber)
+	if req.Firstpage.IdCompany == 2 {
+		_ = createModelTable(pdf, req.GetModels(), req.GetAmount(), number)
+	} else {
+		CreateModelTabel(pdf, req.GetModels(), req.GetAmount(), number, int(req.Firstpage.IdCompany))
 	}
-	// 6. Создаем Таблицу характеристик
-	pdf.AddPage()
-	//characteristicsStartPage := pdf.PageNo()
-	tempLink = links["characteristics"]
-	tempLink.Page = pdf.PageNo()
-	links["characteristics"] = tempLink
 
-	// Устанавливаем место назначения для ссылки на характеристики
-	pdf.SetLink(links["characteristics"].ID, 0, links["characteristics"].Page)
+	//subNumber = 0
+	//if len(req.GetRecomendations()) != 0 {
+	//	pdf.AddPage()
+	//	tempLink = links["recomendations"]
+	//	tempLink.Page = pdf.PageNo()
+	//	links["recomendations"] = tempLink
+	//
+	//	pdf.SetLink(links["recomendations"].ID, 0, links["recomendations"].Page)
+	//
+	//	subNumber++
+	//	createRecomendationsPage(pdf, req.GetRecomendations(), number, subNumber)
+	//}
+	//// 6. Создаем Таблицу характеристик
+	//pdf.AddPage()
+	////characteristicsStartPage := pdf.PageNo()
+	//tempLink = links["characteristics"]
+	//tempLink.Page = pdf.PageNo()
+	//links["characteristics"] = tempLink
+	//
+	//// Устанавливаем место назначения для ссылки на характеристики
+	//pdf.SetLink(links["characteristics"].ID, 0, links["characteristics"].Page)
+	//
+	//// Создаем характеристики
+	//subNumber++
+	//_ = createCharacteristic(pdf, req.GetModels(), req.GetModelsdata(), number, subNumber)
 
-	// Создаем характеристики
-	subNumber++
-	_ = createCharacteristic(pdf, req.GetModels(), req.GetModelsdata(), number, subNumber)
-
-	if req.GetSpecials() {
-		pdf.AddPage()
-		tempLink = links["specials_main"]
-		tempLink.Page = pdf.PageNo()
-		links["specials_main"] = tempLink
-
-		pdf.SetLink(links["specials_main"].ID, 0, links["specials_main"].Page)
-
-		CreatePageSpecials(pdf)
-		//subNumber++
-		//createRecomendationsPage(pdf, req.GetRecomendations(), number, subNumber)
-		//addLink("specials_main", LinkItem{
-		//	ShortName: "specials_main",
-		//	Name:      "ПРИЛОЖЕНИЕ. ОПИСАНИЕ ОБОРУДОВАНИЯ",
-		//	ID:        pdf.AddLink(),
-		//	Page:      0,
-		//	Main:      true,
-		//})
-		//
-		//for _, model := range req.GetModels() {
-		//	addLink("specials_"+model.Name, LinkItem{
-		//		ShortName: "specials_" + model.Name,
-		//		Name:      model.Name + model.ShortNote,
-		//		ID:        pdf.AddLink(),
-		//		Page:      0,
-		//		Main:      false,
-		//	})
-		//}
-	}
+	//if req.GetSpecials() {
+	//	pdf.AddPage()
+	//	tempLink = links["specials_main"]
+	//	tempLink.Page = pdf.PageNo()
+	//	links["specials_main"] = tempLink
+	//
+	//	pdf.SetLink(links["specials_main"].ID, 0, links["specials_main"].Page)
+	//
+	//	CreatePageSpecials(pdf)
+	//
+	//	for _, model := range req.GetModels() {
+	//		pdf.AddPage()
+	//		key := "specials_" + strings.ToLower(model.Name)
+	//		tempLink = links[key]
+	//		tempLink.Page = pdf.PageNo()
+	//		links[key] = tempLink
+	//
+	//		pdf.SetLink(links[key].ID, 0, links[key].Page)
+	//		CreatePageFullInformation(pdf, model)
+	//	}
+	//	//subNumber++
+	//	//createRecomendationsPage(pdf, req.GetRecomendations(), number, subNumber)
+	//	//addLink("specials_main", LinkItem{
+	//	//	ShortName: "specials_main",
+	//	//	Name:      "ПРИЛОЖЕНИЕ. ОПИСАНИЕ ОБОРУДОВАНИЯ",
+	//	//	ID:        pdf.AddLink(),
+	//	//	Page:      0,
+	//	//	Main:      true,
+	//	//})
+	//	//
+	//	//for _, model := range req.GetModels() {
+	//	//	addLink("specials_"+model.Name, LinkItem{
+	//	//		ShortName: "specials_" + model.Name,
+	//	//		Name:      model.Name + model.ShortNote,
+	//	//		ID:        pdf.AddLink(),
+	//	//		Page:      0,
+	//	//		Main:      false,
+	//	//	})
+	//	//}
+	//}
 
 	// 7. ВОЗВРАЩАЕМСЯ на страницу содержания для обновления номеров
 	currentPageBeforeUpdate := pdf.PageNo() // Сохраняем текущую страницу
@@ -448,13 +497,23 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 	pdf.SetRightMargin(32)
 
 	// Перерисовываем содержание с актуальными номерами страниц и теми же ссылками
-	createTableOfContents(pdf, links["tabelModel"].Page, links["characteristics"].Page, links, order)
+	if req.Firstpage.IdCompany == 2 {
+		s.Log.Warn("Побывал тут" + strconv.Itoa(int(req.Firstpage.IdCompany)))
+		createTableOfContents(pdf, links["tabelModel"].Page, links["characteristics"].Page, links, order)
+		// Добавляем вотермарку на страницу содержания
+		AddWatermark(pdf)
 
-	// Добавляем вотермарку на страницу содержания
-	AddWatermark(pdf)
+	} else {
+		s.Log.Warn("Побывал тут в Рондо" + strconv.Itoa(int(req.Firstpage.IdCompany)))
+		CreateTableOfContentsRondo(pdf, links["tabelModel"].Page, links["characteristics"].Page, links, order)
+	}
 
 	// 8. ВАЖНО: Возвращаемся на последнюю страницу
 	pdf.SetPage(currentPageBeforeUpdate)
+
+	/**
+	  КОНЕЦ ТУТ
+	*/
 
 	//pdf.SetPage(currentPageBeforeUpdate)
 
@@ -510,6 +569,9 @@ func createCoverPage(pdf *gofpdf.Fpdf, firstPage *createpdffile.FirstPage) {
 	// Именно поэтому они и 1 и 1 и -10, -10
 	SetImageIntoPDF(pdf, firstPage.GetSmallCoCompanyImage(), -10, -10, 1, 1, "leftImageIntoWaterMark", false)
 	SetImageIntoPDF(pdf, firstPage.GetCompanySmall(), -10, -10, 1, 1, "rightImageIntoWaterMark", false)
+	// Картинка, которая нужна при описании оборудования
+	// Именно поэтому она и 1 и 1 и -10, -10
+	SetImageIntoPDF(pdf, firstPage.GetAppendix(), -10, -10, 1, 1, "appendix", false)
 
 	// Заголовок
 	Text(
@@ -1132,15 +1194,21 @@ func setSpecificationEquipment(pdf *gofpdf.Fpdf, idCompany, number int) {
 		pdf.MultiCell(200, 10, "СПЕЦИФИКАЦИЯ\nОБОРУДОВАНИЯ", "", "L", false)
 		break
 	case 3:
-		pdf.SetXY(25, 0)
-		pdf.SetFont("montserrat", "", 74)
-		pdf.SetTextColor(255, 89, 3)
-		pdf.CellFormat(50, 50, strconv.Itoa(number), "", 0, "L", false, 0, "")
-
-		pdf.SetFont("montserrat", "", 28)
-		pdf.SetTextColor(17, 22, 25)
-		pdf.SetXY(50, 13.5)
-		pdf.MultiCell(200, 10, "СПЕЦИФИКАЦИЯ\nОБОРУДОВАНИЯ", "", "L", false)
+		CreateCircle(pdf, Position{28.568, 25.658}, 8.415, greenColor)
+		TextCellFormat(
+			pdf,
+			rondoWhite,
+			Font{"montserrat", "B", 34},
+			Position{24.028, 25.3},
+			CellString{1, 1, strconv.Itoa(number), "", 0, "L", false, 0, ""},
+		)
+		Text(
+			pdf,
+			rondoBlack,
+			Font{"montserrat", "B", 28},
+			Position{44.929, 19.273},
+			MultiCellString{200, 10, "Спецификация оборудования", "", "L", false},
+		)
 		break
 	}
 }
@@ -1621,7 +1689,7 @@ func createRecomendationsPage(pdf *gofpdf.Fpdf, recomendations []*createpdffile.
 		"Примечание",
 	}
 
-	DrawTableHeader(pdf, tableWidthRecomendation, headers, 16.932)
+	DrawTableHeader(pdf, tableWidthRecomendation, headers, 16.932, true, Font{"Inter", "B", 9.5}, RGBColor{R: 61, G: 74, B: 77})
 
 	rows := make([][]Row, len(recomendations))
 
@@ -1644,7 +1712,7 @@ func createRecomendationsPage(pdf *gofpdf.Fpdf, recomendations []*createpdffile.
 
 	wg.Wait()
 
-	DrawTableRows(pdf, rows, 16.932)
+	DrawTableRows(pdf, rows, 16.932, 36.686, 0, 3, 4)
 
 	AddWatermark(pdf)
 }

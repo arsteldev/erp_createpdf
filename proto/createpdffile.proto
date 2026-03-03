@@ -8,6 +8,20 @@ message ModelSpecials {
   string special = 1;
 }
 
+message FullInformation {
+    int32 boxSize = 1;
+    uint32 countInGroupBox = 2;
+    float depth = 3;
+    float height = 4;
+    uint32 inGroupBox = 5;
+    float mass = 6;
+    uint32 powerConsumption = 7;
+    uint32 ratedPowerSpeaker = 8;
+    float size = 9;
+    uint32 unit = 10;
+    float width = 11;
+}
+
 message Models {
   string name = 1;
   string short_note = 2;
@@ -19,6 +33,7 @@ message Models {
   string icon = 8;
   string description = 9;
   repeated ModelSpecials specials = 10;
+  FullInformation fullInformation = 11;
 }
 
 message ContactUser {
@@ -84,6 +99,7 @@ message FirstPage {
   bytes company_small = 10;
   bytes co_company_small = 11;
   uint32 id_company = 12;
+  bytes appendix = 13;
 }
 
 message CreatePDFRequest {

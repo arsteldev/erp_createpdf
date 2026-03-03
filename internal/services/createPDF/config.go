@@ -3,6 +3,15 @@ package createPDF
 type RGBColor struct {
 	R, G, B int
 }
+type RectInfo struct {
+	x, y, w, h float64
+	styleStr   string
+}
+
+type RoundedRectInfo struct {
+	x, y, w, h, r     float64
+	corners, styleStr string
+}
 
 type Font struct {
 	font  string
@@ -43,3 +52,18 @@ type Row struct {
 	Width float64
 	Text  string
 }
+
+type textCursor struct {
+	paras [][]string // каждая параграф-строка -> слова; пустой параграф = пустая строка
+	p     int        // индекс параграфа
+	w     int        // индекс слова в параграфе
+}
+
+var (
+	greenColor      = RGBColor{R: 0, G: 128, B: 0}
+	color000        = RGBColor{R: 0, G: 0, B: 0}
+	rondoBlack      = RGBColor{R: 43, G: 43, B: 45}
+	rondoLightBeige = RGBColor{237, 238, 224}
+	rondoWhite      = RGBColor{255, 255, 255}
+	arstelOrange    = RGBColor{255, 89, 3}
+)
