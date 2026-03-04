@@ -143,7 +143,7 @@ func convertPNG16to8(imageData []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func DrawTableHeader(pdf *gofpdf.Fpdf, widths []float64, headers []string, headerHeights float64, full bool, font Font, color RGBColor) {
+func DrawTableHeader(pdf *gofpdf.Fpdf, widths []float64, headers []string, headerHeights, leftMargin float64, full bool, font Font, color RGBColor) {
 	pdf.SetTextColor(0, 0, 0)
 	pdf.SetFont(font.font, font.style, font.size)
 	// Для шапки делаем границы того же цвета что и фон
@@ -151,15 +151,14 @@ func DrawTableHeader(pdf *gofpdf.Fpdf, widths []float64, headers []string, heade
 
 	pageWidth, _ := pdf.GetPageSize()
 	currentY := pdf.GetY()
-	startX := pdf.GetX()
+	startX := leftMargin
 
 	// 1. Сначала закрашиваем всю полосу от левого края до правого
 	if full {
-		drawBackgroud(pdf, Position{X: 0, Y: currentY}, Parametrs{Width: pageWidth, Height: headerHeights}, color)
+		drawBackgroud(pdf, Position{X: startX, Y: currentY}, Parametrs{Width: pageWidth, Height: headerHeights}, color)
 	} else {
-		leftMargin := 20.25
-		pageWidth = pageWidth - (2 * leftMargin)
-		drawBackgroud(pdf, Position{X: leftMargin, Y: 39.533}, Parametrs{Width: pageWidth, Height: headerHeights}, color)
+		pageWidth = pageWidth - (2 * startX)
+		drawBackgroud(pdf, Position{X: startX, Y: 39.533}, Parametrs{Width: pageWidth, Height: headerHeights}, color)
 	}
 
 	currentY = pdf.GetY()
@@ -194,7 +193,7 @@ func DrawTableHeader(pdf *gofpdf.Fpdf, widths []float64, headers []string, heade
 	x := startX
 	for i, header := range headers {
 		log.Printf("headers: %s, X: %f", header, x)
-		drawHeaderCell(x, currentY, widths[i], headerHeights, header, "L")
+		drawHeaderCell(x, currentY, widths[i], headerHeights, header, "R")
 		x += widths[i]
 	}
 
@@ -373,6 +372,10 @@ func drawRow(pdf *gofpdf.Fpdf, columns []Row, position Position, color RGBColor,
 	pageWidth, _ := pdf.GetPageSize()
 
 	// Фон строки
+	if leftMargin != 0 {
+		pageWidth = pageWidth - (leftMargin * 2)
+	}
+
 	drawBackgroud(pdf, Position{X: leftMargin, Y: position.Y}, Parametrs{Width: pageWidth, Height: rowHeight1}, color)
 
 	// Текст по ячейкам
@@ -383,8 +386,18 @@ func drawRow(pdf *gofpdf.Fpdf, columns []Row, position Position, color RGBColor,
 	for _, c := range columns {
 		pdf.SetXY(x, y)
 		pdf.SetTextColor(0, 0, 0)
+
+		if c.Font.size != 0 {
+			pdf.SetFont(c.Font.font, c.Font.style, c.Font.size)
+		}
+
+		if c.MultiCell {
+			pdf.MultiCell(c.Width, 10.4, c.Text, "", c.Align, false)
+		} else {
+			pdf.CellFormat(c.Width, rowHeight1, c.Text, "", 0, "L", false, 0, "")
+		}
+
 		// ВАЖНО: используйте MultiCell, если возможны переносы по строкам
-		pdf.CellFormat(c.Width, rowHeight1, c.Text, "", 0, "L", false, 0, "")
 		x += c.Width
 	}
 
@@ -515,9 +528,6 @@ func AddWatermarkRondo(pdf *gofpdf.Fpdf) {
 	pdf.SetDrawColor(greenColor.R, greenColor.G, greenColor.B)
 	pdf.Line(leftMargin, forLine, pageWidth-rightMargin, forLine)
 
-	// Устанавливаем настройки для вотермарки
-	pdf.SetFont("Inter", "", 10.5)
-
 	// Форматируем номер страницы
 	var (
 		currentPageS string
@@ -547,8 +557,8 @@ func AddWatermarkRondo(pdf *gofpdf.Fpdf) {
 	// Сайт
 	TextCellFormat(
 		pdf,
-		greenColor,
-		Font{"Inter", "", 10.5},
+		rondoBlack,
+		Font{"gotham", "", 8},
 		Position{63.443, 185.397},
 		CellString{0, 20, site, "", 0, "L", false, 0, ""},
 	)
@@ -557,7 +567,7 @@ func AddWatermarkRondo(pdf *gofpdf.Fpdf) {
 	TextCellFormat(
 		pdf,
 		greenColor,
-		Font{"Inter", "", 10.5},
+		Font{"gotham", "", 10},
 		Position{posX, 185.397},
 		CellString{0, 20, currentPageS, "", 0, "L", false, 0, ""},
 	)
@@ -659,15 +669,15 @@ func CreateCoverPageRondo(pdf *gofpdf.Fpdf, firstPage *createpdffile.FirstPage) 
 	Text(
 		pdf,
 		greenColor,
-		Font{font: "montserrat", style: "B", size: 43},
+		Font{font: "gotham", style: "B", size: 43},
 		Position{X: -1, Y: 47},
 		MultiCellString{w: 0, h: 38 * math, txtStr: "Коммерческое", borderStr: "", alignStr: "L", fill: false},
 	)
 	Text(
 		pdf,
 		rondoBlack,
-		Font{font: "montserrat", style: "B", size: 43},
-		Position{X: -1, Y: 56},
+		Font{font: "gotham", style: "B", size: 43},
+		Position{X: -1, Y: 57},
 		MultiCellString{w: 0, h: 38 * math, txtStr: "предложение", borderStr: "", alignStr: "L", fill: false},
 	)
 
@@ -676,7 +686,7 @@ func CreateCoverPageRondo(pdf *gofpdf.Fpdf, firstPage *createpdffile.FirstPage) 
 	Text(
 		pdf,
 		rondoBlack,
-		Font{font: "montserrat", style: "M", size: 9},
+		Font{font: "gotham", style: "M", size: 9},
 		Position{X: 100, Y: 42.424},
 		MultiCellString{w: 0, h: 10.8 * math, txtStr: textStr, borderStr: "", alignStr: "L", fill: false},
 	)
@@ -686,14 +696,14 @@ func CreateCoverPageRondo(pdf *gofpdf.Fpdf, firstPage *createpdffile.FirstPage) 
 	Text(
 		pdf,
 		color000,
-		Font{font: "inter", style: "B", size: 12},
+		Font{font: "gotham", style: "B", size: 12},
 		Position{X: -1, Y: 104},
 		MultiCellString{w: 0, h: 14.4 * math, txtStr: firstPage.GetContactuser().GetFullName(), borderStr: "", alignStr: "L", fill: false},
 	)
 
-	fontInterBold12 := Font{font: "inter", style: "B", size: 12}
-	fontInterRegular12 := Font{font: "inter", style: "", size: 12}
-	fontInterItalic10 := Font{font: "inter", style: "I", size: 10}
+	fontInterBold12 := Font{font: "gotham", style: "B", size: 12}
+	fontInterRegular12 := Font{font: "gotham", style: "", size: 12}
+	fontInterItalic10 := Font{font: "gotham", style: "I", size: 10}
 
 	//pdf.SetFont("inter", "I", 10)
 	//pdf.SetTextColor(0, 0, 0)
@@ -731,7 +741,7 @@ func CreateSystemFeaturesRondo(pdf *gofpdf.Fpdf, features []*createpdffile.Syste
 	TextCellFormat(
 		pdf,
 		rondoWhite,
-		Font{"montserrat", "B", 34},
+		Font{"gotham", "B", 28},
 		Position{25.428, 25.3},
 		CellString{1, 1, strconv.Itoa(number), "", 0, "L", false, 0, ""},
 	)
@@ -744,7 +754,7 @@ func CreateSystemFeaturesRondo(pdf *gofpdf.Fpdf, features []*createpdffile.Syste
 	Text(
 		pdf,
 		rondoBlack,
-		Font{"montserrat", "B", 28},
+		Font{"gotham", "B", 28},
 		Position{44.929, 17.355},
 		MultiCellString{200, 10, "Особенности системы \nи требования заказчика", "", "L", false},
 	)
@@ -802,7 +812,7 @@ func DrawNumberedListWordLikeRondo(pdf *gofpdf.Fpdf, items []string) {
 	x0 := colX1
 	y := startY
 
-	baseFont := Font{"montserrat", "", 12}
+	baseFont := Font{"gotham", "", 12}
 
 	pdf.SetFont(baseFont.font, baseFont.style, baseFont.size)
 
@@ -891,117 +901,256 @@ func DrawNumberedListWordLike(pdf *gofpdf.Fpdf, items []string, leftPad, rightPa
 	}
 }
 
+//	func CreateTableOfContentsRondo(pdf *gofpdf.Fpdf, tableStartPage, characteristicsPage int, links map[string]LinkItem, order []string) {
+//		// Устанавливаем отступы
+//		//pdf.SetLeftMargin(78)
+//		pdf.SetLeftMargin(20.153)
+//		//pdf.SetTopMargin(44)
+//		pdf.SetY(16.243)
+//
+//		// Заголовок
+//		TextCellFormat(
+//			pdf,
+//			rondoBlack,
+//			Font{"gotham", "M", 24},
+//			Position{16.243, -1},
+//			CellString{0, 24 * math, "Содержание", "", 0, "L", false, 0, ""},
+//		)
+//
+//		// Шрифт для содержания
+//		pdf.SetY(36.127)
+//
+//		// Функция для добавления пункта содержания
+//		addTOCItem := func(text string, pageNum int, link int, main bool) {
+//			pdf.SetFont("gotham", "M", 12)
+//			y := pdf.GetY()
+//
+//			// Смещение и оформление текста
+//			startX := 20.153
+//			if main {
+//				pdf.SetTextColor(greenColor.R, greenColor.G, greenColor.B)
+//				//text = strings.ToUpper(text)
+//			} else {
+//				pdf.SetTextColor(0, 0, 0)
+//				text = "     " + text // 5 пробелов
+//				startX += 3.656       // визуальное смещение
+//			}
+//
+//			pdf.SetX(startX)
+//
+//			// Рисуем основной текст
+//			if link > 0 {
+//				pdf.CellFormat(0, 16*math, text, "", 0, "L", false, link, "")
+//			} else {
+//				pdf.CellFormat(0, 16*math, text, "", 0, "L", false, 0, "")
+//			}
+//
+//			// Ширины
+//			textWidth := pdf.GetStringWidth(text)
+//			pageWidth, _ := pdf.GetPageSize()
+//
+//			dotStartX := startX + textWidth + 5
+//
+//			// Номер страницы
+//			if pageNum > 0 {
+//				pageNumStr := strconv.Itoa(pageNum)
+//				pageNumWidth := pdf.GetStringWidth(pageNumStr)
+//
+//				// было: pageNumX := pageWidth - 32 - 65
+//				pageNumX := pageWidth - 32 - 65 + 20 // сдвиг номера на 20mm вправо
+//
+//				// было: availableWidth := pageNumX - float64(startX) - 1
+//				availableWidth := pageNumX + 3 - dotStartX - 1 // ширина точек ДО номера
+//
+//				if availableWidth > 0 {
+//					dotWidth := pdf.GetStringWidth(".")
+//					numDots := int(availableWidth / dotWidth)
+//					if numDots <= 0 {
+//						numDots = 1
+//					}
+//
+//					dotText := strings.Repeat(".", numDots)
+//					pdf.SetXY(dotStartX, y)
+//					pdf.SetTextColor(120, 120, 120)
+//					pdf.CellFormat(availableWidth, 16*math, dotText, "", 0, "L", false, 0, "")
+//
+//					CreateRoundedRect(pdf, greenColor, RoundedRectInfo{x: 215.311, y: y, w: 9, h: 5.358, r: 2, corners: "1234", styleStr: "F"})
+//					// Номер страницы
+//					pdf.SetXY(pageNumX-pageNumWidth, y)
+//					pdf.SetFont("gotham", "M", 10)
+//					pdf.SetTextColor(0, 0, 0)
+//
+//					if link > 0 {
+//						pdf.CellFormat(pageNumWidth+10, 16*math, pageNumStr, "", 0, "C", false, link, "")
+//					} else {
+//						pdf.CellFormat(pageNumWidth+10, 16*math, pageNumStr, "", 0, "C", false, 0, "")
+//					}
+//				}
+//
+//			}
+//
+//			pdf.Ln(16 * math)
+//		}
+//
+//		// Добавляем пункты с ссылками
+//		for _, key := range order {
+//			item := links[key]
+//			addTOCItem(item.Name, item.Page, item.ID, item.Main)
+//		}
+//
+//		if pdf.GetImageInfo("logoRondo") != nil {
+//			pdf.Image("logoRondo", 40.539, 132.527, 23.073, 24.801, false, "", 0, "")
+//		}
+//
+//		if pdf.GetImageInfo("logoLDA") != nil {
+//			pdf.Image("logoLDA", 80.399, 137.031, 46.099, 16.818, false, "", 0, "")
+//		}
+//
+//		pageWidth, _ := pdf.GetPageSize()
+//
+//		CreateRect(pdf, rondoLightBeige, RectInfo{0, 163.291, pageWidth, 46.711, "F"})
+//		CreateRoundedRect(pdf, rondoLightBeige, RoundedRectInfo{0, 24.327, 5, 41.416, 3.0, "23", "F"})
+//
+//		AddWatermarkRondo(pdf)
+//	}
 func CreateTableOfContentsRondo(pdf *gofpdf.Fpdf, tableStartPage, characteristicsPage int, links map[string]LinkItem, order []string) {
-	// Устанавливаем отступы
-	//pdf.SetLeftMargin(78)
+	// Поля/позиции
 	pdf.SetLeftMargin(20.153)
-	//pdf.SetTopMargin(44)
 	pdf.SetY(16.243)
 
 	// Заголовок
 	TextCellFormat(
 		pdf,
 		rondoBlack,
-		Font{"montserrat", "M", 24},
+		Font{"gotham", "M", 24},
 		Position{16.243, -1},
 		CellString{0, 24 * math, "Содержание", "", 0, "L", false, 0, ""},
 	)
 
-	// Шрифт для содержания
-	pdf.SetFont("inter", "", 12)
-	pdf.SetY(36.127)
+	// Константы по требованиям
+	const (
+		yFirstItem = 36.127
+		itemGap    = 5.347
 
-	// Функция для добавления пункта содержания
+		mainX = 20.153
+		subX  = 23.809
+
+		lineH = 16.0 // в "мм", дальше умножаем на math
+
+		dotsPad = 3.72
+
+		rectX      = 215.311
+		rectW      = 9.0
+		rectH      = 5.358
+		rectTopPad = 1.429
+	)
+
+	// Первый пункт на нужном Y
+	pdf.SetY(yFirstItem)
+
 	addTOCItem := func(text string, pageNum int, link int, main bool) {
 		y := pdf.GetY()
 
-		// Смещение и оформление текста
-		startX := 20.153
+		// --- Стили пункта ---
+		startX := subX
+		fontSize := 10.0
 		if main {
+			startX = mainX
+			fontSize = 12.0
 			pdf.SetTextColor(greenColor.R, greenColor.G, greenColor.B)
-			//text = strings.ToUpper(text)
 		} else {
 			pdf.SetTextColor(0, 0, 0)
-			text = "     " + text // 5 пробелов
-			startX += 3.656       // визуальное смещение
 		}
 
-		pdf.SetX(startX)
+		// --- Текст пункта ---
+		pdf.SetFont("gotham", "M", fontSize)
+		pdf.SetXY(startX, y)
 
-		// Рисуем основной текст
 		if link > 0 {
-			pdf.CellFormat(0, 16*math, text, "", 0, "L", false, link, "")
+			pdf.CellFormat(0, lineH*math, text, "", 0, "L", false, link, "")
 		} else {
-			pdf.CellFormat(0, 16*math, text, "", 0, "L", false, 0, "")
+			pdf.CellFormat(0, lineH*math, text, "", 0, "L", false, 0, "")
 		}
 
-		// Ширины
-		textWidth := pdf.GetStringWidth(text)
-		pageWidth, _ := pdf.GetPageSize()
+		// --- Точки до прямоугольника с номером ---
+		textW := pdf.GetStringWidth(text)
 
-		dotStartX := startX + textWidth + 5
+		dotStartX := startX + textW + dotsPad
+		dotEndX := rectX - dotsPad
+		availableDotsW := dotEndX - dotStartX
 
-		// Номер страницы
+		if availableDotsW > 0 {
+			pdf.SetTextColor(120, 120, 120)
+			pdf.SetFont("gotham", "M", fontSize)
+
+			dotW := pdf.GetStringWidth(".")
+			if dotW > 0 {
+				n := int(availableDotsW / dotW)
+				if n < 1 {
+					n = 1
+				}
+
+				// гарантируем, что ширина dots не превысит availableDotsW
+				for n > 0 && pdf.GetStringWidth(strings.Repeat(".", n)) > availableDotsW {
+					n--
+				}
+				if n < 1 {
+					n = 1
+				}
+
+				dots := strings.Repeat(".", n)
+				pdf.SetXY(dotStartX, y)
+				pdf.CellFormat(availableDotsW, lineH*math, dots, "", 0, "L", false, 0, "")
+			}
+		}
+
+		// --- Прямоугольник с номером страницы ---
+		CreateRoundedRect(
+			pdf,
+			greenColor,
+			RoundedRectInfo{x: rectX, y: y, w: rectW, h: rectH, r: 3.5, corners: "1234", styleStr: "F"},
+		)
+
 		if pageNum > 0 {
 			pageNumStr := strconv.Itoa(pageNum)
-			pageNumWidth := pdf.GetStringWidth(pageNumStr)
 
-			// было: pageNumX := pageWidth - 32 - 65
-			pageNumX := pageWidth - 32 - 65 + 20 // сдвиг номера на 20mm вправо
+			pdf.SetFont("gotham", "M", 10)
+			pdf.SetTextColor(rondoWhite.R, rondoWhite.G, rondoWhite.B)
 
-			// было: availableWidth := pageNumX - float64(startX) - 1
-			availableWidth := pageNumX + 3 - dotStartX - 1 // ширина точек ДО номера
+			numW := pdf.GetStringWidth(pageNumStr)
+			xText := rectX + (rectW-numW)/2
 
-			if availableWidth > 0 {
-				dotWidth := pdf.GetStringWidth(".")
-				numDots := int(availableWidth / dotWidth)
-				if numDots <= 0 {
-					numDots = 1
-				}
+			fontSizePt := 10.0
+			fontSizeMm := fontSizePt * 0.352777
+			ascent := 0.8 * fontSizeMm
+			yBaseline := y + rectTopPad + ascent
 
-				dotText := strings.Repeat(".", numDots)
-				pdf.SetXY(dotStartX, y)
-				pdf.SetTextColor(120, 120, 120)
-				pdf.CellFormat(availableWidth, 16*math, dotText, "", 0, "L", false, 0, "")
-
-				// Номер страницы
-				pdf.SetXY(pageNumX-pageNumWidth, y)
-				pdf.SetTextColor(0, 0, 0)
-
-				if link > 0 {
-					pdf.CellFormat(pageNumWidth+10, 16*math, pageNumStr, "", 0, "R", false, link, "")
-				} else {
-					pdf.CellFormat(pageNumWidth+10, 16*math, pageNumStr, "", 0, "R", false, 0, "")
-				}
-			}
-
+			pdf.Text(xText, yBaseline, pageNumStr)
 		}
 
-		pdf.Ln(16 * math)
+		// Следующая строка: lineH + itemGap
+		pdf.SetY(y + (lineH+itemGap)*math)
 	}
 
-	// Добавляем пункты с ссылками
+	// Пункты
 	for _, key := range order {
 		item := links[key]
 		addTOCItem(item.Name, item.Page, item.ID, item.Main)
 	}
 
+	// Логотипы и низ страницы — как было
 	if pdf.GetImageInfo("logoRondo") != nil {
 		pdf.Image("logoRondo", 40.539, 132.527, 23.073, 24.801, false, "", 0, "")
 	}
-
 	if pdf.GetImageInfo("logoLDA") != nil {
 		pdf.Image("logoLDA", 80.399, 137.031, 46.099, 16.818, false, "", 0, "")
 	}
 
 	pageWidth, _ := pdf.GetPageSize()
-
 	CreateRect(pdf, rondoLightBeige, RectInfo{0, 163.291, pageWidth, 46.711, "F"})
 	CreateRoundedRect(pdf, rondoLightBeige, RoundedRectInfo{0, 24.327, 5, 41.416, 3.0, "23", "F"})
 
-	if links["characteristics"].Page == 0 {
-		AddWatermarkRondo(pdf)
-	}
+	AddWatermarkRondo(pdf)
 }
 
 func CreateCircle(pdf *gofpdf.Fpdf, position Position, radius float64, color RGBColor) {
@@ -1021,7 +1170,7 @@ func ImageEquipmentsRondo(pdf *gofpdf.Fpdf, picture []byte, name, nameImage stri
 	TextCellFormat(
 		pdf,
 		rondoWhite,
-		Font{"montserrat", "B", 26},
+		Font{"gotham", "B", 24},
 		Position{21.428, 25.3},
 		CellString{1, 1, number + "." + subNumber, "", 0, "L", false, 0, ""},
 	)
@@ -1029,7 +1178,7 @@ func ImageEquipmentsRondo(pdf *gofpdf.Fpdf, picture []byte, name, nameImage stri
 	Text(
 		pdf,
 		rondoBlack,
-		Font{"montserrat", "B", 24},
+		Font{"gotham", "B", 24},
 		Position{44.929, 19.273},
 		MultiCellString{200, 10, result, "", "L", false},
 	)
@@ -1062,7 +1211,7 @@ func SelectsEquipmentsRondo(pdf *gofpdf.Fpdf, text string, number int) {
 	TextCellFormat(
 		pdf,
 		rondoWhite,
-		Font{"montserrat", "B", 34},
+		Font{"gotham", "B", 28},
 		Position{25.428, 25.3},
 		CellString{1, 1, strconv.Itoa(number), "", 0, "L", false, 0, ""},
 	)
@@ -1070,7 +1219,7 @@ func SelectsEquipmentsRondo(pdf *gofpdf.Fpdf, text string, number int) {
 	Text(
 		pdf,
 		rondoBlack,
-		Font{"montserrat", "B", 28},
+		Font{"gotham", "B", 28},
 		Position{titleX, titleY},
 		MultiCellString{200, 10, "Выбор оборудования", "", "L", false},
 	)
@@ -1095,14 +1244,14 @@ func SelectsEquipmentsRondo(pdf *gofpdf.Fpdf, text string, number int) {
 		rightMaxLines = 1
 	}
 
-	// Текстовый стиль
-	pdf.SetFont("montserrat", "", 12)
-	pdf.SetTextColor(rondoBlack.R, rondoBlack.G, rondoBlack.B)
-
 	cur := newTextCursor(text)
 
 	// Рисуем страницы пока курсор не закончится
 	for {
+		// Текстовый стиль
+		pdf.SetFont("gotham", "", 12)
+		pdf.SetTextColor(rondoBlack.R, rondoBlack.G, rondoBlack.B)
+
 		// Левая колонка
 		leftLines := cur.fillLines(pdf, leftW, int(leftMaxLines))
 		drawLinesColumn(pdf, leftX, leftStartY, leftW, lineH, leftLines, true)
@@ -1357,9 +1506,10 @@ func CreateModelTabel(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 
 	// ПЕРВАЯ СТРАНИЦА
 	var (
-		headers       []string
-		headerHeights float64
-		needFull      bool
+		headers                            []string
+		headerHeights, leftMargin, heights float64
+		needFull                           bool
+		color1, color2                     RGBColor
 	)
 	setSpecificationEquipment(pdf, idCompany, number)
 
@@ -1383,9 +1533,12 @@ func CreateModelTabel(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 		}
 
 		headerHeights = 16.932
-		//rowHeights = 36.686
+		heights = 36.686
 		needFull = true
-		//leftMargin = 0
+
+		leftMargin = 0
+		color1 = RGBColor{255, 255, 255}
+		color2 = RGBColor{232, 237, 237}
 
 		for i, r := range pictures {
 			i, r := i, r
@@ -1400,6 +1553,7 @@ func CreateModelTabel(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 				}
 			}()
 		}
+
 	} else {
 		headers = []string{
 			"№",
@@ -1410,57 +1564,52 @@ func CreateModelTabel(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 			"Наличие",
 		}
 		tableWidths = []float64{
-			14,
-			117.012,
-			28.326,
-			26.473,
-			25.244,
-			26.976,
+			14 + 1.403,
+			117.012 + 1.403,
+			28.326 + 1.403,
+			26.473 + 1.403,
+			25.244 + 2.51,
+			26.976 + 3,
 		}
+
 		headerHeights = 10
 		needFull = false
+		heights = 12.4
 
-		//leftMargin = 20.25
+		leftMargin = 20.25
+		color1 = rondoWhite
+		color2 = rondoLightBeige
+
 		AddWatermarkRondo(pdf)
 
-		//rowHeights = 12.4
-		/**
-		message Models {
-		  string name = 1;
-		  string short_note = 2;
-		  uint32 count = 3;
-		  string presence = 4;
-		  bytes img = 5;
-		  float money_one = 6;
-		  float money_count = 7;
-		  string icon = 8;
-		  string description = 9;
-		  repeated ModelSpecials specials = 10;
-		  FullInformation fullInformation = 11;
-		}
-		*/
+		font9 := Font{"gotham", "", 9}
+		font10 := Font{"gotham", "", 10}
+		fontM10 := Font{"gotham", "M", 10}
+
 		for i, r := range pictures {
 			i, r := i, r
 			go func() {
 				defer wg.Done()
 
 				rows[i] = []Row{
-					{Width: tableWidths[0], Text: strconv.Itoa(i + 1)},
-					{Width: tableWidths[1], Text: r.GetName()},
-					//{Width: tableWidths[1], Text: r.GetShortNote()},
-					{Width: tableWidths[2], Text: strconv.Itoa(int(r.GetCount()))},
-					{Width: tableWidths[3], Text: strconv.Itoa(int(r.GetMoneyOne()))},
-					{Width: tableWidths[4], Text: strconv.Itoa(int(r.GetMoneyCount()))},
-					{Width: tableWidths[5], Text: r.GetPresence()},
+					{Width: tableWidths[0], Text: strconv.Itoa(i + 1), Align: "R", Font: fontM10},
+					{Width: 32.717, Text: r.GetName(), Align: "L", MultiCell: true, Font: fontM10},
+					{Width: 82.633, Text: r.GetShortNote(), Align: "L", MultiCell: true, Font: font9},
+					{Width: tableWidths[2], Text: strconv.Itoa(int(r.GetCount())), Align: "R", Font: font10},
+					{Width: tableWidths[3], Text: strconv.Itoa(int(r.GetMoneyOne())), Align: "R", Font: font10},
+					{Width: tableWidths[4], Text: strconv.Itoa(int(r.GetMoneyCount())), Align: "R", Font: font10},
+					{Width: tableWidths[5], Text: r.GetPresence(), Align: "R"},
 				}
 			}()
 		}
+
 	}
 
 	wg.Wait()
 
-	DrawTableHeader(pdf, tableWidths, headers, headerHeights, needFull, Font{"montserrat", "", 12}, RGBColor{140, 121, 104})
+	DrawTableHeader(pdf, tableWidths, headers, headerHeights, leftMargin, needFull, Font{"gotham", "M", 9.5}, RGBColor{140, 121, 104})
 
+	DrawRows(pdf, heights, leftMargin, rows, color1, color2)
 	//pdf.SetDrawColor(180, 180, 180)
 	//pdf.SetLineWidth(0.3)
 	//
@@ -1534,4 +1683,187 @@ func CreateModelTabel(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 	//}
 	//
 	//createSumm(pdf, amount, modelsDrawn%2 == 1, needRub, needText)
+}
+
+func DrawRows(pdf *gofpdf.Fpdf, height, leftMargin float64, rows [][]Row, color1, color2 RGBColor) {
+	log.Printf("X: %f, Y: %f", pdf.GetX(), pdf.GetY())
+	var color RGBColor
+	for i, row := range rows {
+		color = color1
+		if i%2 == 1 {
+			color = color2
+		}
+
+		drawRow(pdf, row, Position{X: pdf.GetX(), Y: pdf.GetY()}, color, height, leftMargin)
+	}
+}
+
+func CreateCharacteristicRondo(pdf *gofpdf.Fpdf, additionallyEquipment []*createpdffile.Models, characteristicData *createpdffile.ModelsData, number, subNumber int) {
+	CreateCircle(pdf, Position{28.568, 25.658}, 8.415, greenColor)
+
+	TextCellFormat(
+		pdf,
+		rondoWhite,
+		Font{"gotham", "B", 24},
+		Position{25.428, 25.3},
+		CellString{1, 1, strconv.Itoa(number) + "." + strconv.Itoa(subNumber), "", 0, "L", false, 0, ""},
+	)
+
+	Text(
+		pdf,
+		rondoBlack,
+		Font{"gotham", "B", 24},
+		Position{44.929, 19.273},
+		MultiCellString{200, 10, "Выбор оборудования", "", "L", false},
+	)
+
+	_, pageHeight := pdf.GetPageSize()
+	if pdf.GetImageInfo("appendix") != nil {
+		pdf.Image("appendix", 281.733, 0, 15.267, pageHeight, false, "", 0, "")
+	}
+
+	// Первая группа: Мощностные характеристики
+	TextCellFormat(
+		pdf,
+		greenColor,
+		Font{"gotham", "M", 12},
+		Position{26.612, 55.483},
+		CellString{0, 10, "Мощностные характеристики системы", "", 0, "L", false, 0, ""},
+	)
+	//yPos := 17 + 24*math + 22.576
+	//pdf.SetY(yPos)
+	//pdf.SetFont("inter", "", 12)
+	//pdf.SetTextColor(237, 114, 3)
+	//pdf.CellFormat(0, 16*math, "Мощностные характеристики системы", "", 0, "L", false, 0, "")
+
+	// Данные первой группы
+	yPos := 64.238
+	//pdf.SetX(26.612)
+	//yPos += 16 * math
+	pdf.SetY(yPos)
+	pdf.SetFont("gotham", "M", 12)
+	//pdf.SetTextColor(37, 36, 36)
+
+	labelWidth := (32+99.3868)*math + 90
+	valueWidth := 60.0 * math
+
+	fontLabel := Font{"gotham", "", 10.5}
+	fontValue := Font{"gotham", "", 12}
+
+	powerData1 := []PowerDataRondo{
+		{"Общая потребляемая мощность, Вт", characteristicData.GetPowerConsumption(), fontLabel, fontValue},
+		{"Общая выходная мощность, Вт", characteristicData.GetMaxPower(), fontLabel, fontValue},
+		{"Общая мощность громко говорителей, Вт", characteristicData.GetRatedPowerSpeaker(), fontLabel, fontValue},
+	}
+
+	powerDataPDFRondo(pdf, powerData1, labelWidth, valueWidth)
+
+	// Вторая группа: Массогабаритные характеристики
+
+	CreateRoundedRect(pdf, rondoLightBeige, RoundedRectInfo{
+		x:        19.531,
+		y:        89.479,
+		w:        160.5,
+		h:        47.978,
+		r:        2,
+		corners:  "1234",
+		styleStr: "F",
+	})
+
+	Text(
+		pdf,
+		greenColor,
+		Font{"gotham", "M", 12},
+		Position{26.612, 97.782},
+		MultiCellString{0, 16 * math, "Массогабаритные характеристики\nоборудования по спецификации", "", "L", false},
+	)
+	//
+	////pdf.SetFont("inter", "", 12)
+	////pdf.SetTextColor(237, 114, 3)
+	////pdf.MultiCell(0, 16*math, "Массогабаритные характеристики\nоборудования по спецификации", "", "L", false)
+	//
+	//// Данные второй группы
+	//yPos = pdf.GetY() + 5*math // Небольшой отступ после заголовка
+	//pdf.SetY(yPos)
+	//pdf.SetFont("inter", "", 12)
+	//pdf.SetTextColor(37, 36, 36)
+	//
+	powerData2 := []PowerDataRondo{
+		{"Общая высота, U", characteristicData.GetUnit(), fontLabel, fontValue},
+		{"Масса брутто, кг", characteristicData.GetMass(), fontLabel, fontValue},
+		{"Объем с учетом упаковки, м3", characteristicData.GetSize(), fontLabel, fontValue},
+	}
+
+	powerDataPDFRondo(pdf, powerData2, labelWidth, valueWidth)
+	AddWatermarkRondo(pdf)
+}
+
+func powerDataPDFRondo(pdf *gofpdf.Fpdf, powerData []PowerDataRondo, labelWidth, valueWidth float64) {
+	const (
+		startX = 26.612
+		valueX = 156.246
+	)
+
+	rowH := 16 * math
+
+	for i, data := range powerData {
+		// Текущая строка (Y)
+		y := pdf.GetY()
+
+		// 1) Лейбл
+		TextCellFormat(
+			pdf,
+			rondoBlack,
+			data.FontLabel,
+			Position{X: startX, Y: y},
+			CellString{0, rowH, data.Label, "", 0, "L", false, 0, ""},
+		)
+
+		// 2) Точки (считаем ширину текста лейбла тем же шрифтом)
+		labelW := pdf.GetStringWidth(data.Label)
+		dotW := pdf.GetStringWidth(".")
+		dotsStartX := startX + labelW
+		space := valueX - dotsStartX
+
+		if space > 0 && dotW > 0 {
+			n := int(space / dotW)
+			if n > 0 {
+				dots := strings.Repeat(".", n-4)
+
+				// Печатаем точки строго после текста
+				TextCellFormat(
+					pdf,
+					rondoBlack,
+					data.FontLabel,
+					Position{X: dotsStartX, Y: y},
+					CellString{0, rowH, "  " + dots + "  ", "", 0, "L", false, 0, ""},
+				)
+			}
+		}
+
+		// 3) Значение
+		var valueText string
+		switch v := data.Value.(type) {
+		case int:
+			valueText = strconv.Itoa(v)
+		case float64:
+			valueText = strconv.FormatFloat(v, 'f', -1, 64)
+		case float32:
+			valueText = strconv.FormatFloat(float64(v), 'f', -1, 32)
+		default:
+			valueText = fmt.Sprintf("%v", v)
+		}
+
+		TextCellFormat(
+			pdf,
+			rondoBlack,
+			data.FontValue,
+			Position{X: valueX, Y: y},
+			CellString{valueWidth, rowH, valueText, "", 0, "L", false, 0, ""},
+		)
+
+		if i != len(powerData)-1 {
+			pdf.SetY(y + rowH) // вместо Ln, чтобы не зависеть от каретки
+		}
+	}
 }

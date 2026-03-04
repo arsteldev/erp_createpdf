@@ -50,6 +50,13 @@ type PowerData struct {
 	Value interface{}
 }
 
+type PowerDataRondo struct {
+	Label     string
+	Value     interface{}
+	FontLabel Font
+	FontValue Font
+}
+
 // Ширины для альбомной ориентации
 var tableWidths = []float64{
 	10,  // № (шире для двузначных номеров)
@@ -125,6 +132,10 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		"inter-italic":        {"Inter-Italic.ttf", "inter", "I"},
 		"inter-medium":        {"Inter-Medium.ttf", "inter", "M"},
 		"inter-semibold":      {"Inter-SemiBold.ttf", "inter", "SB"},
+		"gotham-regular":      {"GothamPro-Regular.ttf", "gotham", ""},
+		"gotham-bold":         {"GothamPro-Bold.ttf", "gotham", "B"},
+		"gotham-italic":       {"GothamPro-Italic.ttf", "gotham", "I"},
+		"gotham-medium":       {"GothamPro-Medium.ttf", "gotham", "M"},
 	}
 
 	// Проверяем все шрифты
@@ -186,6 +197,11 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		pdf.AddUTF8Font("inter", "I", "Inter-Italic.ttf")
 		pdf.AddUTF8Font("inter", "M", "Inter-Medium.ttf")
 		pdf.AddUTF8Font("inter", "SB", "Inter-SemiBold.ttf")
+
+		pdf.AddUTF8Font("gotham", "", "GothamPro-Regular.ttf")
+		pdf.AddUTF8Font("gotham", "B", "GothamPro-Bold.ttf")
+		pdf.AddUTF8Font("gotham", "I", "GothamPro-Italic.ttf")
+		pdf.AddUTF8Font("gotham", "M", "GothamPro-Medium.ttf")
 
 		// Устанавливаем шрифт по умолчанию
 		pdf.SetFont("montserrat", "", 14)
@@ -414,32 +430,38 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		CreateModelTabel(pdf, req.GetModels(), req.GetAmount(), number, int(req.Firstpage.IdCompany))
 	}
 
-	//subNumber = 0
-	//if len(req.GetRecomendations()) != 0 {
-	//	pdf.AddPage()
-	//	tempLink = links["recomendations"]
-	//	tempLink.Page = pdf.PageNo()
-	//	links["recomendations"] = tempLink
-	//
-	//	pdf.SetLink(links["recomendations"].ID, 0, links["recomendations"].Page)
-	//
-	//	subNumber++
-	//	createRecomendationsPage(pdf, req.GetRecomendations(), number, subNumber)
-	//}
-	//// 6. Создаем Таблицу характеристик
-	//pdf.AddPage()
-	////characteristicsStartPage := pdf.PageNo()
-	//tempLink = links["characteristics"]
-	//tempLink.Page = pdf.PageNo()
-	//links["characteristics"] = tempLink
-	//
-	//// Устанавливаем место назначения для ссылки на характеристики
-	//pdf.SetLink(links["characteristics"].ID, 0, links["characteristics"].Page)
-	//
-	//// Создаем характеристики
-	//subNumber++
-	//_ = createCharacteristic(pdf, req.GetModels(), req.GetModelsdata(), number, subNumber)
+	subNumber = 0
+	if len(req.GetRecomendations()) != 0 {
+		pdf.AddPage()
+		tempLink = links["recomendations"]
+		tempLink.Page = pdf.PageNo()
+		links["recomendations"] = tempLink
 
+		pdf.SetLink(links["recomendations"].ID, 0, links["recomendations"].Page)
+
+		subNumber++
+		if req.Firstpage.IdCompany == 2 {
+			createRecomendationsPage(pdf, req.GetRecomendations(), number, subNumber)
+		}
+	}
+
+	// 6. Создаем Таблицу характеристик
+	pdf.AddPage()
+	//characteristicsStartPage := pdf.PageNo()
+	tempLink = links["characteristics"]
+	tempLink.Page = pdf.PageNo()
+	links["characteristics"] = tempLink
+
+	// Устанавливаем место назначения для ссылки на характеристики
+	pdf.SetLink(links["characteristics"].ID, 0, links["characteristics"].Page)
+
+	// Создаем характеристики
+	subNumber++
+	if req.Firstpage.IdCompany == 2 {
+		_ = createCharacteristic(pdf, req.GetModels(), req.GetModelsdata(), number, subNumber)
+	} else {
+		CreateCharacteristicRondo(pdf, req.GetModels(), req.GetModelsdata(), number, subNumber)
+	}
 	//if req.GetSpecials() {
 	//	pdf.AddPage()
 	//	tempLink = links["specials_main"]
@@ -1198,14 +1220,14 @@ func setSpecificationEquipment(pdf *gofpdf.Fpdf, idCompany, number int) {
 		TextCellFormat(
 			pdf,
 			rondoWhite,
-			Font{"montserrat", "B", 34},
+			Font{"gotham", "B", 28},
 			Position{24.028, 25.3},
 			CellString{1, 1, strconv.Itoa(number), "", 0, "L", false, 0, ""},
 		)
 		Text(
 			pdf,
 			rondoBlack,
-			Font{"montserrat", "B", 28},
+			Font{"gotham", "B", 28},
 			Position{44.929, 19.273},
 			MultiCellString{200, 10, "Спецификация оборудования", "", "L", false},
 		)
@@ -1689,7 +1711,7 @@ func createRecomendationsPage(pdf *gofpdf.Fpdf, recomendations []*createpdffile.
 		"Примечание",
 	}
 
-	DrawTableHeader(pdf, tableWidthRecomendation, headers, 16.932, true, Font{"Inter", "B", 9.5}, RGBColor{R: 61, G: 74, B: 77})
+	DrawTableHeader(pdf, tableWidthRecomendation, headers, 16.932, 0, true, Font{"Inter", "B", 9.5}, RGBColor{R: 61, G: 74, B: 77})
 
 	rows := make([][]Row, len(recomendations))
 
@@ -1702,10 +1724,10 @@ func createRecomendationsPage(pdf *gofpdf.Fpdf, recomendations []*createpdffile.
 			defer wg.Done()
 
 			rows[i] = []Row{
-				{Width: tableWidthRecomendation[0], Text: strconv.Itoa(i + 1)},
-				{Width: tableWidthRecomendation[1], Text: r.GetName()},
-				{Width: tableWidthRecomendation[2], Text: strconv.Itoa(int(r.GetCount()))},
-				{Width: tableWidthRecomendation[3], Text: r.GetDescription()},
+				{Width: tableWidthRecomendation[0], Text: strconv.Itoa(i + 1), Align: "L"},
+				{Width: tableWidthRecomendation[1], Text: r.GetName(), Align: "L"},
+				{Width: tableWidthRecomendation[2], Text: strconv.Itoa(int(r.GetCount())), Align: "L"},
+				{Width: tableWidthRecomendation[3], Text: r.GetDescription(), Align: "L"},
 			}
 		}()
 	}
