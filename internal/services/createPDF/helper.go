@@ -8,6 +8,7 @@ import (
 	"github.com/jung-kurt/gofpdf"
 	"image/png"
 	"log"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,6 +18,8 @@ import (
 const (
 	FullInformationImageWidthArstel  = 135
 	FullInformationImageHeightArstel = 47
+	FullInformationImageWidthRondo   = 91.704
+	FullInformationImageHeightRondo  = 58.782
 )
 
 func Text(pdf *gofpdf.Fpdf, rgb RGBColor, font Font, position Position, cellString MultiCellString) {
@@ -144,7 +147,7 @@ func convertPNG16to8(imageData []byte) ([]byte, error) {
 }
 
 func DrawTableHeader(pdf *gofpdf.Fpdf, widths []float64, headers []string, headerHeights, leftMargin float64, full bool, font Font, color RGBColor) {
-	pdf.SetTextColor(0, 0, 0)
+	pdf.SetTextColor(255, 255, 255)
 	pdf.SetFont(font.font, font.style, font.size)
 	// Для шапки делаем границы того же цвета что и фон
 	pdf.SetDrawColor(color.R, color.G, color.B)
@@ -158,7 +161,7 @@ func DrawTableHeader(pdf *gofpdf.Fpdf, widths []float64, headers []string, heade
 		drawBackgroud(pdf, Position{X: startX, Y: currentY}, Parametrs{Width: pageWidth, Height: headerHeights}, color)
 	} else {
 		pageWidth = pageWidth - (2 * startX)
-		drawBackgroud(pdf, Position{X: startX, Y: 39.533}, Parametrs{Width: pageWidth, Height: headerHeights}, color)
+		drawBackgroud(pdf, Position{X: startX, Y: 38.995}, Parametrs{Width: pageWidth, Height: headerHeights}, color)
 	}
 
 	currentY = pdf.GetY()
@@ -166,6 +169,9 @@ func DrawTableHeader(pdf *gofpdf.Fpdf, widths []float64, headers []string, heade
 	// 2. Теперь рисуем текст в ячейках
 	// Функция для рисования ячейки с многострочным текстом
 	drawHeaderCell := func(x, y, width, height float64, text, align string) {
+		if text == "Наименование оборудования и характеристики" {
+			align = "L"
+		}
 		// Рассчитываем параметры для текста
 		lines := strings.Split(text, "\n")
 		lineCount := len(lines)
@@ -193,7 +199,7 @@ func DrawTableHeader(pdf *gofpdf.Fpdf, widths []float64, headers []string, heade
 	x := startX
 	for i, header := range headers {
 		log.Printf("headers: %s, X: %f", header, x)
-		drawHeaderCell(x, currentY, widths[i], headerHeights, header, "R")
+		drawHeaderCell(x, currentY, widths[i], headerHeights, header, "C")
 		x += widths[i]
 	}
 
@@ -573,28 +579,52 @@ func AddWatermarkRondo(pdf *gofpdf.Fpdf) {
 	)
 }
 
-func CreatePageSpecials(pdf *gofpdf.Fpdf) {
+func CreatePageSpecials(pdf *gofpdf.Fpdf, idCompany uint32, number int) {
 	pageWidth, pageHeight := pdf.GetPageSize()
-	pdf.Image("coverBackground", 0, 0, pageWidth, pageHeight, false, "", 0, "")
-	pdf.Image("companyLogo", 34, 17, 60, 15, false, "", 0, "")
-	pdf.Image("smallLogo", pageWidth-64, 19, 32, 9, false, "", 0, "")
-	pdf.Image("mainPageLogo", pageWidth-120, pageHeight-130, 110, 50, false, "", 0, "")
+	if idCompany == 2 {
+		pdf.Image("coverBackground", 0, 0, pageWidth, pageHeight, false, "", 0, "")
+		pdf.Image("companyLogo", 34, 17, 60, 15, false, "", 0, "")
+		pdf.Image("smallLogo", pageWidth-64, 19, 32, 9, false, "", 0, "")
+		pdf.Image("mainPageLogo", pageWidth-120, pageHeight-130, 110, 50, false, "", 0, "")
 
-	Text(
-		pdf,
-		RGBColor{R: 37, G: 36, B: 36},
-		Font{font: "montserrat", style: "M", size: 34},
-		Position{X: -1, Y: 47},
-		MultiCellString{w: 0, h: 38 * math, txtStr: "ОПИСАНИЕ\nОБОРУДОВАНИЯ", borderStr: "", alignStr: "L", fill: false},
-	)
+		Text(
+			pdf,
+			RGBColor{R: 37, G: 36, B: 36},
+			Font{font: "montserrat", style: "M", size: 34},
+			Position{X: -1, Y: 47},
+			MultiCellString{w: 0, h: 38 * math, txtStr: "ОПИСАНИЕ\nОБОРУДОВАНИЯ", borderStr: "", alignStr: "L", fill: false},
+		)
 
-	Text(
-		pdf,
-		RGBColor{R: 37, G: 36, B: 36},
-		Font{font: "montserrat", style: "M", size: 14},
-		Position{X: -1, Y: 87},
-		MultiCellString{w: 0, h: 10.8 * math, txtStr: "Приложение к коммерческому\nпредложению", borderStr: "", alignStr: "L", fill: false},
-	)
+		Text(
+			pdf,
+			RGBColor{R: 37, G: 36, B: 36},
+			Font{font: "montserrat", style: "M", size: 14},
+			Position{X: -1, Y: 87},
+			MultiCellString{w: 0, h: 10.8 * math, txtStr: "Приложение к коммерческому\nпредложению", borderStr: "", alignStr: "L", fill: false},
+		)
+	} else {
+		DrawNumberInCircle(pdf, Position{28.568, 25.658}, 8.415, 24, number, 0)
+
+		Text(
+			pdf,
+			rondoBlack,
+			Font{"gotham", "B", 24},
+			Position{44.929, 17.603},
+			MultiCellString{200, 10, "Описание оборудования", "", "L", false},
+		)
+
+		Text(
+			pdf,
+			rondoBlack,
+			Font{"gotham", "M", 12},
+			Position{44.929, 28.511},
+			MultiCellString{200, 10, "Приложение к коммерческому предложению", "", "L", false},
+		)
+
+		pdf.Image("mainPageLogo", 0, 67.891, pageWidth, 117.46, false, "", 0, "")
+
+	}
+
 }
 
 func CreatePageFullInformation(pdf *gofpdf.Fpdf, model *createpdffile.Models) {
@@ -640,6 +670,76 @@ func CreatePageFullInformation(pdf *gofpdf.Fpdf, model *createpdffile.Models) {
 	}
 
 	Text(pdf, headerColor, monseratMedium16, Position{X: lineX, Y: 140}, MultiCellString{w: 140, h: 14.4 * math, txtStr: "ТЕХНИЧЕСКИЕ ХАРАКТЕРИСТИКИ", borderStr: "", alignStr: "J", fill: false})
+
+}
+
+func CreatePageFullInformationRondo(pdf *gofpdf.Fpdf, model *createpdffile.Models) {
+	pdf.AddPage()
+	/**
+	Шрифты
+	*/
+	gothamBold24 := Font{font: "gotham", style: "B", size: 24}
+	gothamMedium12 := Font{font: "gotham", style: "M", size: 12}
+	gothamLight105 := Font{font: "gotham", style: "L", size: 10.5}
+	//gothamRegular9 := Font{font: "gotham", style: "", size: 9}
+
+	SetImageIntoPDF(pdf, model.GetImg(), 168.965, 14.519, FullInformationImageWidthArstel, FullInformationImageHeightArstel, model.Name, false)
+
+	//pdf.Image(model.Name, 168.965, 14.519, FullInformationImageWidthRondo, FullInformationImageHeightRondo, false, "", 0, "")
+	//pdf.Image(model.Name, 168.965, 14.519, FullInformationImageWidthArstel, FullInformationImageHeightArstel, false, "", 0, "")
+
+	TextCellFormat(pdf, greenColor, gothamBold24, Position{26.008, 16.243}, CellString{0, 10, model.Name, "", 1, "L", false, 0, ""})
+	TextCellFormat(pdf, rondoBlack, gothamMedium12, Position{26.008, 25.481}, CellString{0, 10, model.ShortNote, "", 1, "L", false, 0, ""})
+
+	if pdf.GetImageInfo("logoLDA") != nil {
+		pdf.Image("logoLDA", 113.198, 14.519, 30.067, 10.969, false, "", 0, "")
+	}
+
+	CreateRoundedRect(pdf, rondoLightBeige, RoundedRectInfo{x: 20.248, y: 35.164, w: 124.017, h: 134.703, r: 1, corners: "1234", styleStr: "F"})
+
+	textLeftMargin := 26.165
+	TextCellFormat(pdf, greenColor, gothamMedium12, Position{textLeftMargin, 43.425}, CellString{0, 10, "Описание", "", 1, "L", false, 0, ""})
+	Text(pdf, rondoBlack, gothamLight105, Position{X: textLeftMargin, Y: 52.152}, MultiCellString{w: 112.183, h: 14.4 * math, txtStr: model.Description, borderStr: "", alignStr: "L", fill: false})
+
+	TextCellFormat(pdf, greenColor, gothamMedium12, Position{textLeftMargin, 104.43}, CellString{0, 10, "Особенности", "", 1, "L", false, 0, ""})
+	//Text(pdf, rondoBlack, gothamLight105, Position{X: textLeftMargin, Y: 110.842}, MultiCellString{w: 112.183, h: 10 * math, txtStr: model.Description, borderStr: "", alignStr: "L", fill: false})
+
+	Text(pdf, greenColor, gothamMedium12, Position{X: 152.739, Y: 79.777}, MultiCellString{w: 140, h: 14.4 * math, txtStr: "Технические характеристики", borderStr: "", alignStr: "L", fill: false})
+	pdf.SetY(115.842)
+	for _, special := range model.Specials {
+		Text(pdf, rondoBlack, gothamLight105, Position{X: textLeftMargin, Y: -1}, MultiCellString{w: 112.183, h: 8 * math, txtStr: special.Special, borderStr: "", alignStr: "L", fill: false})
+		pdf.Ln(2)
+		//startY += -1
+	}
+	//TextCellFormat(
+	//	pdf,
+	//	headerColor,
+	//	Font{
+	//		font:  "montserrat",
+	//		style: "M",
+	//		size:  36,
+	//	},
+	//	Position{
+	//		X: 30,
+	//		Y: 30,
+	//	},
+	//	CellString{0, 14.4 * math, model.Name, "", 1, "L", false, 0, ""},
+	//)
+	//lineX := float64(30)
+	//lineY := float64(80)
+
+	//Text(pdf, mainColor, interRegular18, Position{X: lineX, Y: 40}, MultiCellString{w: 100, h: 14.4 * math, txtStr: model.ShortNote, borderStr: "", alignStr: "L", fill: false})
+	//Text(pdf, headerColor, monseratMedium16, Position{X: lineX, Y: lineY}, MultiCellString{w: 40, h: 14.4 * math, txtStr: "ОПИСАНИЕ", borderStr: "", alignStr: "J", fill: false})
+	//Text(pdf, mainColor, interRegular8, Position{X: lineX, Y: lineY + 10}, MultiCellString{w: 100, h: 14.4 * math, txtStr: model.Description, borderStr: "", alignStr: "J", fill: false})
+	//
+	//Text(pdf, headerColor, monseratMedium16, Position{X: 150, Y: lineY}, MultiCellString{w: 120, h: 14.4 * math, txtStr: "ОСОБЕННОСТИ", borderStr: "", alignStr: "J", fill: false})
+	//startX := 150
+	//startY := 90
+	//for _, special := range model.Specials {
+	//	Text(pdf, mainColor, interRegular10, Position{X: float64(startX), Y: float64(startY)}, MultiCellString{w: 100, h: 8 * math, txtStr: "* " + special.Special, borderStr: "", alignStr: "J", fill: false})
+	//	pdf.Ln(2)
+	//	startY = -1
+	//}
 
 }
 
@@ -736,15 +836,8 @@ func CreateRoundedRect(pdf *gofpdf.Fpdf, color RGBColor, roundedRectInfo Rounded
 }
 
 func CreateSystemFeaturesRondo(pdf *gofpdf.Fpdf, features []*createpdffile.SystemFeatures, number int) {
-	CreateCircle(pdf, Position{28.568, 25.658}, 8.415, greenColor)
-	//20.153, 16.243
-	TextCellFormat(
-		pdf,
-		rondoWhite,
-		Font{"gotham", "B", 28},
-		Position{25.428, 25.3},
-		CellString{1, 1, strconv.Itoa(number), "", 0, "L", false, 0, ""},
-	)
+	DrawNumberInCircle(pdf, Position{28.568, 25.658}, 8.415, 24, number, 0)
+
 	//pdf.SetXY(25, 0)
 	//pdf.SetFont("montserrat", "", 74)
 	//pdf.SetTextColor(255, 89, 3)
@@ -1108,7 +1201,7 @@ func CreateTableOfContentsRondo(pdf *gofpdf.Fpdf, tableStartPage, characteristic
 		CreateRoundedRect(
 			pdf,
 			greenColor,
-			RoundedRectInfo{x: rectX, y: y, w: rectW, h: rectH, r: 3.5, corners: "1234", styleStr: "F"},
+			RoundedRectInfo{x: rectX, y: y, w: rectW, h: rectH, r: 2.5, corners: "1234", styleStr: "F"},
 		)
 
 		if pageNum > 0 {
@@ -1158,22 +1251,24 @@ func CreateCircle(pdf *gofpdf.Fpdf, position Position, radius float64, color RGB
 	pdf.Circle(position.X, position.Y, radius, "F")
 }
 
-func ImageEquipmentsRondo(pdf *gofpdf.Fpdf, picture []byte, name, nameImage string, number, subNumber string) {
+func ImageEquipmentsRondo(pdf *gofpdf.Fpdf, picture []byte, name, nameImage string, number, subNumber int) {
 	runes := []rune(name)
 	var result string
 	if len(runes) > 4 {
 		result = string(runes[4:])
 	}
 
-	CreateCircle(pdf, Position{28.568, 25.658}, 8.415, greenColor)
+	DrawNumberInCircle(pdf, Position{28.568, 25.658}, 8.415, 24, number, subNumber)
 
-	TextCellFormat(
-		pdf,
-		rondoWhite,
-		Font{"gotham", "B", 24},
-		Position{21.428, 25.3},
-		CellString{1, 1, number + "." + subNumber, "", 0, "L", false, 0, ""},
-	)
+	//CreateCircle(pdf, Position{28.568, 25.658}, 8.415, greenColor)
+	//
+	//TextCellFormat(
+	//	pdf,
+	//	rondoWhite,
+	//	Font{"gotham", "B", 24},
+	//	Position{21.428, 25.3},
+	//	CellString{1, 1, number + "." + subNumber, "", 0, "L", false, 0, ""},
+	//)
 
 	Text(
 		pdf,
@@ -1206,15 +1301,7 @@ func SelectsEquipmentsRondo(pdf *gofpdf.Fpdf, text string, number int) {
 		titleX = 44.929
 	)
 
-	CreateCircle(pdf, Position{28.568, 25.658}, 8.415, greenColor)
-
-	TextCellFormat(
-		pdf,
-		rondoWhite,
-		Font{"gotham", "B", 28},
-		Position{25.428, 25.3},
-		CellString{1, 1, strconv.Itoa(number), "", 0, "L", false, 0, ""},
-	)
+	DrawNumberInCircle(pdf, Position{28.568, 25.658}, 8.415, 24, number, 0)
 
 	Text(
 		pdf,
@@ -1477,237 +1564,435 @@ func splitLongWordByWidth(pdf *gofpdf.Fpdf, word string, maxW float64) []string 
 	return out
 }
 
-func CreateModelTabel(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount *createpdffile.Amount, number, idCompany int) {
-	const (
-		maxTotalModelsFirstPageArstel = 3
-		maxTotalModelsPageArstel      = 4
-		maxTotalModelsFirstPageRondo  = 10
-		maxTotalModelsPageRondo       = 11
+//	func CreateModelTabel(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount *createpdffile.Amount, number, idCompany int) {
+//		const (
+//			maxTotalModelsFirstPageArstel = 3
+//			maxTotalModelsPageArstel      = 4
+//			maxTotalModelsFirstPageRondo  = 10
+//			maxTotalModelsPageRondo       = 11
+//		)
+//
+//		//modelsOnCurrentPage := 0
+//		//tablePageNumber := 1
+//		//totalModels := len(pictures)
+//		//icon := pictures[0].Icon
+//		//needRub := false
+//		//var needText string
+//		//switch icon {
+//		//case "₽":
+//		//	needRub = true
+//		//	break
+//		//}
+//
+//		// Настройка PDF
+//		if idCompany == 2 {
+//			pdf.SetLeftMargin(32)
+//			pdf.SetRightMargin(32)
+//			pdf.SetTopMargin(15)
+//		}
+//
+//		// ПЕРВАЯ СТРАНИЦА
+//		var (
+//			headers                            []string
+//			headerHeights, leftMargin, heights float64
+//			needFull                           bool
+//			color1, color2                     RGBColor
+//		)
+//		setSpecificationEquipment(pdf, idCompany, number)
+//
+//		rows := make([][]Row, len(pictures))
+//
+//		var wg sync.WaitGroup
+//		wg.Add(len(pictures))
+//
+//		if idCompany == 2 {
+//			pdf.SetY(50)
+//			AddWatermark(pdf)
+//
+//			headers = []string{
+//				"№",
+//				"Наименование,\nописание оборудования",
+//				"Кол-во,\nшт.",
+//				"Цена",
+//				"Сумма",
+//				"Наличие",
+//				"Фото",
+//			}
+//
+//			headerHeights = 16.932
+//			heights = 36.686
+//			needFull = true
+//
+//			leftMargin = 0
+//			color1 = RGBColor{255, 255, 255}
+//			color2 = RGBColor{232, 237, 237}
+//
+//			for i, r := range pictures {
+//				i, r := i, r
+//				go func() {
+//					defer wg.Done()
+//
+//					rows[i] = []Row{
+//						{Width: tableWidthRecomendation[0], Text: strconv.Itoa(i + 1)},
+//						{Width: tableWidthRecomendation[1], Text: r.GetName()},
+//						{Width: tableWidthRecomendation[2], Text: strconv.Itoa(int(r.GetCount()))},
+//						{Width: tableWidthRecomendation[3], Text: r.GetDescription()},
+//					}
+//				}()
+//			}
+//
+//		} else {
+//			headers = []string{
+//				"№",
+//				"Наименование оборудования и характеристики",
+//				"Кол-во, шт.",
+//				"Цена, $",
+//				"Сумма, $",
+//				"Наличие",
+//			}
+//			tableWidths = []float64{
+//				14 + 1.403,
+//				117.012 + 1.403,
+//				28.326 + 1.403,
+//				26.473 + 1.403,
+//				25.244 + 2.51,
+//				26.976 + 3,
+//			}
+//
+//			headerHeights = 10
+//			needFull = false
+//			heights = 12.4
+//
+//			leftMargin = 20.25
+//			color1 = rondoWhite
+//			color2 = rondoLightBeige
+//
+//			AddWatermarkRondo(pdf)
+//
+//			font9 := Font{"gotham", "", 9}
+//			font10 := Font{"gotham", "", 10}
+//			fontM10 := Font{"gotham", "M", 10}
+//
+//			for i, r := range pictures {
+//				i, r := i, r
+//				go func() {
+//					defer wg.Done()
+//
+//					rows[i] = []Row{
+//						{Width: tableWidths[0], Text: strconv.Itoa(i + 1), Align: "R", Font: fontM10},
+//						{Width: 32.717, Text: r.GetName(), Align: "L", MultiCell: true, Font: fontM10},
+//						{Width: 82.633, Text: r.GetShortNote(), Align: "L", MultiCell: true, Font: font9},
+//						{Width: tableWidths[2], Text: strconv.Itoa(int(r.GetCount())), Align: "R", Font: font10},
+//						{Width: tableWidths[3], Text: strconv.Itoa(int(r.GetMoneyOne())), Align: "R", Font: font10},
+//						{Width: tableWidths[4], Text: strconv.Itoa(int(r.GetMoneyCount())), Align: "R", Font: font10},
+//						{Width: tableWidths[5], Text: r.GetPresence(), Align: "R"},
+//					}
+//				}()
+//			}
+//
+//		}
+//
+//		wg.Wait()
+//
+//		DrawTableHeader(pdf, tableWidths, headers, headerHeights, leftMargin, needFull, Font{"gotham", "M", 9.5}, RGBColor{140, 121, 104})
+//
+//		DrawRows(pdf, heights, leftMargin, rows, color1, color2)
+//		//pdf.SetDrawColor(180, 180, 180)
+//		//pdf.SetLineWidth(0.3)
+//		//
+//		//// Обработка первой страницы (максимум 3 модели)
+//		//firstPageLimit := 3
+//		//modelsDrawn := 0
+//		//
+//		//for i := 0; i < totalModels && i < firstPageLimit; i++ {
+//		//	rowColor := getRowColor(i)
+//		//	pdf.SetFillColor(rowColor.R, rowColor.G, rowColor.B)
+//		//	drawTableRow(pdf, i, pictures[i], tableWidths, i%2 == 0)
+//		//	if pictures[i].GetPresence() == "Заказ" {
+//		//		needText = "По условиям договора поставка осуществляется при 100% предоплате со склада в Санкт-Петербурге.\nЦены указаны с учетом НДС 22%. Срок поставки оборудования под заказ  –  3 месяца с момента оплаты счета."
+//		//	}
+//		//	modelsDrawn++
+//		//	modelsOnCurrentPage++
+//		//}
+//		//
+//		//// Если на первой странице есть место для итогов (моделей < 3)
+//		//if totalModels < 3 {
+//		//	// Итоги на первой странице
+//		//	createSumm(pdf, amount, modelsDrawn%2 == 0, needRub, needText)
+//		//}
+//		//
+//		//// Если ровно 3 модели - новая страница для итогов
+//		//if totalModels == 3 {
+//		//	pdf.AddPage()
+//		//	tablePageNumber++
+//		//	// Только шапка на странице с итогами
+//		//	AddWatermark(pdf)
+//		//	pdf.SetY(20)
+//		//	drawTableHeaderForLandscape(pdf, tableWidths, 14.11)
+//		//	createSumm(pdf, amount, true, needRub, needText)
+//		//}
+//		//
+//		//// Если больше 3 моделей
+//		//modelsOnCurrentPage = 0
+//		//
+//		//// ВТОРАЯ И ПОСЛЕДУЮЩИЕ СТРАНИЦЫ
+//		//for i := 3; i < totalModels; i++ {
+//		//	// Если это начало новой страницы
+//		//	if modelsOnCurrentPage == 0 {
+//		//		pdf.AddPage()
+//		//		tablePageNumber++
+//		//		pdf.SetY(17)
+//		//		drawTableHeaderForLandscape(pdf, tableWidths, 14.11)
+//		//		AddWatermark(pdf)
+//		//	}
+//		//
+//		//	rowColor := getRowColor(modelsOnCurrentPage)
+//		//	pdf.SetFillColor(rowColor.R, rowColor.G, rowColor.B)
+//		//	drawTableRow(pdf, i, pictures[i], tableWidths, modelsOnCurrentPage%2 == 0)
+//		//	if pictures[i].GetPresence() == "Заказ" {
+//		//		needText = "По условиям договора поставка осуществляется при 100% предоплате со склада в Санкт-Петербурге.\nЦены указаны с учетом НДС 20%. Срок поставки оборудования под заказ  –  3 месяца с момента оплаты счета."
+//		//	}
+//		//	modelsOnCurrentPage++
+//		//	modelsDrawn++
+//		//
+//		//	// Проверяем лимит в 4 строки на странице
+//		//	if modelsOnCurrentPage >= 4 {
+//		//		// Если это последняя модель и страница полная - итоги на следующей
+//		//		if i == totalModels-1 {
+//		//			pdf.AddPage()
+//		//			tablePageNumber++
+//		//			pdf.SetY(20)
+//		//			drawTableHeaderForLandscape(pdf, tableWidths, 14.11)
+//		//			AddWatermark(pdf)
+//		//		}
+//		//		modelsOnCurrentPage = 0
+//		//	}
+//		//}
+//		//
+//		createSumm(pdf, amount, modelsDrawn%2 == 1, needRub, needText)
+//	}
+
+func CreateModelTabel(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount *createpdffile.Amount, number int) {
+	DrawNumberInCircle(pdf, Position{28.568, 25.658}, 8.415, 24, number, 0)
+
+	Text(
+		pdf,
+		rondoBlack,
+		Font{"gotham", "B", 28},
+		Position{44.929, 19.273},
+		MultiCellString{200, 10, "Спецификация оборудования", "", "L", false},
 	)
-
-	//modelsOnCurrentPage := 0
-	//tablePageNumber := 1
-	//totalModels := len(pictures)
-	//icon := pictures[0].Icon
-	//needRub := false
-	//var needText string
-	//switch icon {
-	//case "₽":
-	//	needRub = true
-	//	break
-	//}
-
-	// Настройка PDF
-	if idCompany == 2 {
-		pdf.SetLeftMargin(32)
-		pdf.SetRightMargin(32)
-		pdf.SetTopMargin(15)
-	}
-
-	// ПЕРВАЯ СТРАНИЦА
-	var (
-		headers                            []string
-		headerHeights, leftMargin, heights float64
-		needFull                           bool
-		color1, color2                     RGBColor
-	)
-	setSpecificationEquipment(pdf, idCompany, number)
 
 	rows := make([][]Row, len(pictures))
-
 	var wg sync.WaitGroup
 	wg.Add(len(pictures))
 
-	if idCompany == 2 {
-		pdf.SetY(50)
-		AddWatermark(pdf)
+	headers := []string{"№", "Наименование оборудования и характеристики", "Кол-во, шт.", "Цена, $", "Сумма, $", "Наличие"}
 
-		headers = []string{
-			"№",
-			"Наименование,\nописание оборудования",
-			"Кол-во,\nшт.",
-			"Цена",
-			"Сумма",
-			"Наличие",
-			"Фото",
-		}
+	tableWidths = []float64{
+		14 + 1.403,
+		117.012 + 1.403,
+		28.326 + 1.403,
+		26.473 + 1.403,
+		25.244 + 2.51,
+		26.976 + 3,
+	}
 
-		headerHeights = 16.932
-		heights = 36.686
-		needFull = true
+	headerH := 10
+	//needFull := false
+	rowBaseH := 12.4
 
-		leftMargin = 0
-		color1 = RGBColor{255, 255, 255}
-		color2 = RGBColor{232, 237, 237}
+	leftMargin := 20.25
+	//color1 := rondoWhite
+	//color2 := rondoLightBeige
 
-		for i, r := range pictures {
-			i, r := i, r
-			go func() {
-				defer wg.Done()
+	AddWatermarkRondo(pdf)
 
-				rows[i] = []Row{
-					{Width: tableWidthRecomendation[0], Text: strconv.Itoa(i + 1)},
-					{Width: tableWidthRecomendation[1], Text: r.GetName()},
-					{Width: tableWidthRecomendation[2], Text: strconv.Itoa(int(r.GetCount()))},
-					{Width: tableWidthRecomendation[3], Text: r.GetDescription()},
-				}
-			}()
-		}
+	font9 := Font{"gotham", "", 9}
+	font10 := Font{"gotham", "", 10}
+	fontM10 := Font{"gotham", "M", 10}
 
-	} else {
-		headers = []string{
-			"№",
-			"Наименование оборудования и характеристики",
-			"Кол-во, шт.",
-			"Цена, $",
-			"Сумма, $",
-			"Наличие",
-		}
-		tableWidths = []float64{
-			14 + 1.403,
-			117.012 + 1.403,
-			28.326 + 1.403,
-			26.473 + 1.403,
-			25.244 + 2.51,
-			26.976 + 3,
-		}
+	tWidths := []float64{
+		17.213,
+		117.012 + 1.403,
+		28.326 + 1.403,
+		26.473 + 1.403,
+		25.244 + 2.51,
+		26.976 + 3,
+	}
 
-		headerHeights = 10
-		needFull = false
-		heights = 12.4
+	for i, r := range pictures {
+		i, r := i, r
+		go func() {
+			defer wg.Done()
 
-		leftMargin = 20.25
-		color1 = rondoWhite
-		color2 = rondoLightBeige
+			rows[i] = []Row{
+				{Width: tWidths[0], Text: strconv.Itoa(i + 1), Align: "C", Font: fontM10},
 
-		AddWatermarkRondo(pdf)
+				{Width: 32.717 + 1.144, Text: r.GetName(), Align: "L", MultiCell: true, Font: fontM10},
+				{Width: 82.633 + 1.403, Text: r.GetShortNote(), Align: "L", MultiCell: true, Font: font9},
 
-		font9 := Font{"gotham", "", 9}
-		font10 := Font{"gotham", "", 10}
-		fontM10 := Font{"gotham", "M", 10}
-
-		for i, r := range pictures {
-			i, r := i, r
-			go func() {
-				defer wg.Done()
-
-				rows[i] = []Row{
-					{Width: tableWidths[0], Text: strconv.Itoa(i + 1), Align: "R", Font: fontM10},
-					{Width: 32.717, Text: r.GetName(), Align: "L", MultiCell: true, Font: fontM10},
-					{Width: 82.633, Text: r.GetShortNote(), Align: "L", MultiCell: true, Font: font9},
-					{Width: tableWidths[2], Text: strconv.Itoa(int(r.GetCount())), Align: "R", Font: font10},
-					{Width: tableWidths[3], Text: strconv.Itoa(int(r.GetMoneyOne())), Align: "R", Font: font10},
-					{Width: tableWidths[4], Text: strconv.Itoa(int(r.GetMoneyCount())), Align: "R", Font: font10},
-					{Width: tableWidths[5], Text: r.GetPresence(), Align: "R"},
-				}
-			}()
-		}
-
+				{Width: tWidths[2], Text: formatNumber(int(r.GetCount())), Align: "C", Font: font10},
+				{Width: tWidths[3], Text: formatNumber(int(r.GetMoneyOne())), Align: "C", Font: font10},
+				{Width: tWidths[4], Text: formatNumber(int(r.GetMoneyCount())), Align: "C", Font: font10},
+				{Width: tWidths[5], Text: r.GetPresence(), Align: "C", Font: font10},
+			}
+		}()
 	}
 
 	wg.Wait()
 
-	DrawTableHeader(pdf, tableWidths, headers, headerHeights, leftMargin, needFull, Font{"gotham", "M", 9.5}, RGBColor{140, 121, 104})
+	DrawTableHeader(
+		pdf,
+		tWidths,
+		headers,
+		float64(headerH),
+		leftMargin,
+		false,
+		Font{"gotham", "M", 9.5},
+		RGBColor{140, 121, 104},
+	)
 
-	DrawRows(pdf, heights, leftMargin, rows, color1, color2)
-	//pdf.SetDrawColor(180, 180, 180)
-	//pdf.SetLineWidth(0.3)
-	//
-	//// Обработка первой страницы (максимум 3 модели)
-	//firstPageLimit := 3
-	//modelsDrawn := 0
-	//
-	//for i := 0; i < totalModels && i < firstPageLimit; i++ {
-	//	rowColor := getRowColor(i)
-	//	pdf.SetFillColor(rowColor.R, rowColor.G, rowColor.B)
-	//	drawTableRow(pdf, i, pictures[i], tableWidths, i%2 == 0)
-	//	if pictures[i].GetPresence() == "Заказ" {
-	//		needText = "По условиям договора поставка осуществляется при 100% предоплате со склада в Санкт-Петербурге.\nЦены указаны с учетом НДС 22%. Срок поставки оборудования под заказ  –  3 месяца с момента оплаты счета."
-	//	}
-	//	modelsDrawn++
-	//	modelsOnCurrentPage++
-	//}
-	//
-	//// Если на первой странице есть место для итогов (моделей < 3)
-	//if totalModels < 3 {
-	//	// Итоги на первой странице
-	//	createSumm(pdf, amount, modelsDrawn%2 == 0, needRub, needText)
-	//}
-	//
-	//// Если ровно 3 модели - новая страница для итогов
-	//if totalModels == 3 {
-	//	pdf.AddPage()
-	//	tablePageNumber++
-	//	// Только шапка на странице с итогами
-	//	AddWatermark(pdf)
-	//	pdf.SetY(20)
-	//	drawTableHeaderForLandscape(pdf, tableWidths, 14.11)
-	//	createSumm(pdf, amount, true, needRub, needText)
-	//}
-	//
-	//// Если больше 3 моделей
-	//modelsOnCurrentPage = 0
-	//
-	//// ВТОРАЯ И ПОСЛЕДУЮЩИЕ СТРАНИЦЫ
-	//for i := 3; i < totalModels; i++ {
-	//	// Если это начало новой страницы
-	//	if modelsOnCurrentPage == 0 {
-	//		pdf.AddPage()
-	//		tablePageNumber++
-	//		pdf.SetY(17)
-	//		drawTableHeaderForLandscape(pdf, tableWidths, 14.11)
-	//		AddWatermark(pdf)
-	//	}
-	//
-	//	rowColor := getRowColor(modelsOnCurrentPage)
-	//	pdf.SetFillColor(rowColor.R, rowColor.G, rowColor.B)
-	//	drawTableRow(pdf, i, pictures[i], tableWidths, modelsOnCurrentPage%2 == 0)
-	//	if pictures[i].GetPresence() == "Заказ" {
-	//		needText = "По условиям договора поставка осуществляется при 100% предоплате со склада в Санкт-Петербурге.\nЦены указаны с учетом НДС 20%. Срок поставки оборудования под заказ  –  3 месяца с момента оплаты счета."
-	//	}
-	//	modelsOnCurrentPage++
-	//	modelsDrawn++
-	//
-	//	// Проверяем лимит в 4 строки на странице
-	//	if modelsOnCurrentPage >= 4 {
-	//		// Если это последняя модель и страница полная - итоги на следующей
-	//		if i == totalModels-1 {
-	//			pdf.AddPage()
-	//			tablePageNumber++
-	//			pdf.SetY(20)
-	//			drawTableHeaderForLandscape(pdf, tableWidths, 14.11)
-	//			AddWatermark(pdf)
-	//		}
-	//		modelsOnCurrentPage = 0
-	//	}
-	//}
-	//
-	//createSumm(pdf, amount, modelsDrawn%2 == 1, needRub, needText)
-}
-
-func DrawRows(pdf *gofpdf.Fpdf, height, leftMargin float64, rows [][]Row, color1, color2 RGBColor) {
-	log.Printf("X: %f, Y: %f", pdf.GetX(), pdf.GetY())
-	var color RGBColor
+	countOn := 11
+	count := 0
+	startX, startY := pdf.GetX(), pdf.GetY()
+	newPageY := startY
 	for i, row := range rows {
-		color = color1
-		if i%2 == 1 {
-			color = color2
+		if count == countOn {
+			pdf.AddPage()
+			DrawTableHeader(
+				pdf,
+				tWidths,
+				headers,
+				float64(headerH),
+				leftMargin,
+				false,
+				Font{"gotham", "M", 9.5},
+				RGBColor{140, 121, 104},
+			)
+			startY = newPageY
+			AddWatermarkRondo(pdf)
 		}
 
-		drawRow(pdf, row, Position{X: pdf.GetX(), Y: pdf.GetY()}, color, height, leftMargin)
+		backGroudColor := rondoWhite
+		if i%2 == 0 {
+			backGroudColor = rondoLightBeige
+		}
+
+		DrawRow(pdf, row, backGroudColor, startX, startY, rowBaseH)
+		count++
+		startY += rowBaseH
+		if i == len(rows)-1 {
+			if count == countOn {
+				pdf.AddPage()
+				DrawTableHeader(
+					pdf,
+					tWidths,
+					headers,
+					float64(headerH),
+					leftMargin,
+					false,
+					Font{"gotham", "M", 9.5},
+					RGBColor{140, 121, 104},
+				)
+				startY = newPageY
+				AddWatermarkRondo(pdf)
+			}
+			CreateSum(pdf, startX, startY, rowBaseH, amount, greenColor)
+		}
+	}
+	AddWatermarkRondo(pdf)
+
+}
+
+func formatNumber(n int) string {
+	s := strconv.Itoa(n)
+	re := regexp.MustCompile(`(\d+)(\d{3})`)
+	for {
+		res := re.ReplaceAllString(s, "$1 $2")
+		if res == s {
+			return res
+		}
+		s = res
+	}
+}
+
+func CreateSum(pdf *gofpdf.Fpdf, x, y, rowBaseH float64, amount *createpdffile.Amount, backGroudColor RGBColor) {
+	pageWidth, _ := pdf.GetPageSize()
+	padding := 20.25
+
+	fontM105 := Font{"gotham", "M", 10.5}
+
+	drawBackgroud(pdf, Position{x, y}, Parametrs{
+		Width:  pageWidth - (2 * padding),
+		Height: rowBaseH,
+	}, backGroudColor)
+
+	pdf.SetFont(fontM105.font, fontM105.style, fontM105.size)
+	pdf.SetTextColor(rondoWhite.R, rondoWhite.G, rondoWhite.B)
+	textY := y + rowBaseH/2 + pdf.PointConvert(fontM105.size)/2.8
+	pdf.Text(padding+19.213, textY, "ИТОГО:")
+	pdf.Text(200, textY, formatNumber(int(amount.GetMoney())/100)+amount.GetIcon())
+}
+
+func DrawRow(pdf *gofpdf.Fpdf, row []Row, backGroudColor RGBColor, x, y, rowBaseH float64) {
+	pageWidth, _ := pdf.GetPageSize()
+	padding := 20.25
+
+	drawBackgroud(pdf, Position{x, y}, Parametrs{
+		Width:  pageWidth - (2 * padding),
+		Height: rowBaseH,
+	}, backGroudColor)
+
+	startX := x
+
+	for _, column := range row {
+		pdf.SetFont(column.Font.font, column.Font.style, column.Font.size)
+
+		lines := pdf.SplitText(column.Text, column.Width)
+		lineCount := len(lines)
+		if lineCount == 0 {
+			lineCount = 1
+		}
+
+		lineHeight := pdf.PointConvert(column.Font.size) * 1.15
+		textHeight := float64(lineCount) * lineHeight
+
+		offsetY := (rowBaseH - textHeight) / 2
+		if offsetY < 0 {
+			offsetY = 0
+		}
+
+		if lineCount > 1 {
+			offsetY += lineHeight * 0.18
+		}
+
+		color := rondoBlack
+		if column.Green {
+			color = greenColor
+		}
+
+		Text(
+			pdf,
+			color,
+			column.Font,
+			Position{X: startX, Y: y + offsetY},
+			MultiCellString{
+				w:         column.Width,
+				h:         lineHeight,
+				txtStr:    column.Text,
+				borderStr: "",
+				alignStr:  column.Align,
+				fill:      false,
+			},
+		)
+
+		startX += column.Width
 	}
 }
 
 func CreateCharacteristicRondo(pdf *gofpdf.Fpdf, additionallyEquipment []*createpdffile.Models, characteristicData *createpdffile.ModelsData, number, subNumber int) {
-	CreateCircle(pdf, Position{28.568, 25.658}, 8.415, greenColor)
-
-	TextCellFormat(
-		pdf,
-		rondoWhite,
-		Font{"gotham", "B", 24},
-		Position{25.428, 25.3},
-		CellString{1, 1, strconv.Itoa(number) + "." + strconv.Itoa(subNumber), "", 0, "L", false, 0, ""},
-	)
+	DrawNumberInCircle(pdf, Position{28.568, 25.658}, 8.415, 24, number, subNumber)
 
 	Text(
 		pdf,
@@ -1730,19 +2015,11 @@ func CreateCharacteristicRondo(pdf *gofpdf.Fpdf, additionallyEquipment []*create
 		Position{26.612, 55.483},
 		CellString{0, 10, "Мощностные характеристики системы", "", 0, "L", false, 0, ""},
 	)
-	//yPos := 17 + 24*math + 22.576
-	//pdf.SetY(yPos)
-	//pdf.SetFont("inter", "", 12)
-	//pdf.SetTextColor(237, 114, 3)
-	//pdf.CellFormat(0, 16*math, "Мощностные характеристики системы", "", 0, "L", false, 0, "")
 
 	// Данные первой группы
 	yPos := 64.238
-	//pdf.SetX(26.612)
-	//yPos += 16 * math
 	pdf.SetY(yPos)
 	pdf.SetFont("gotham", "M", 12)
-	//pdf.SetTextColor(37, 36, 36)
 
 	labelWidth := (32+99.3868)*math + 90
 	valueWidth := 60.0 * math
@@ -1759,7 +2036,6 @@ func CreateCharacteristicRondo(pdf *gofpdf.Fpdf, additionallyEquipment []*create
 	powerDataPDFRondo(pdf, powerData1, labelWidth, valueWidth)
 
 	// Вторая группа: Массогабаритные характеристики
-
 	CreateRoundedRect(pdf, rondoLightBeige, RoundedRectInfo{
 		x:        19.531,
 		y:        89.479,
@@ -1777,17 +2053,7 @@ func CreateCharacteristicRondo(pdf *gofpdf.Fpdf, additionallyEquipment []*create
 		Position{26.612, 97.782},
 		MultiCellString{0, 16 * math, "Массогабаритные характеристики\nоборудования по спецификации", "", "L", false},
 	)
-	//
-	////pdf.SetFont("inter", "", 12)
-	////pdf.SetTextColor(237, 114, 3)
-	////pdf.MultiCell(0, 16*math, "Массогабаритные характеристики\nоборудования по спецификации", "", "L", false)
-	//
-	//// Данные второй группы
-	//yPos = pdf.GetY() + 5*math // Небольшой отступ после заголовка
-	//pdf.SetY(yPos)
-	//pdf.SetFont("inter", "", 12)
-	//pdf.SetTextColor(37, 36, 36)
-	//
+
 	powerData2 := []PowerDataRondo{
 		{"Общая высота, U", characteristicData.GetUnit(), fontLabel, fontValue},
 		{"Масса брутто, кг", characteristicData.GetMass(), fontLabel, fontValue},
@@ -1866,4 +2132,28 @@ func powerDataPDFRondo(pdf *gofpdf.Fpdf, powerData []PowerDataRondo, labelWidth,
 			pdf.SetY(y + rowH) // вместо Ln, чтобы не зависеть от каретки
 		}
 	}
+}
+
+func DrawNumberInCircle(pdf *gofpdf.Fpdf, center Position, r float64, fontSize float64, number, subNumber int) {
+	text := strconv.Itoa(number)
+	if subNumber != 0 {
+		text += "." + strconv.Itoa(subNumber)
+	}
+
+	CreateCircle(pdf, center, r, greenColor)
+
+	// Квадрат, описанный вокруг круга: левый верх = (cx-r, cy-r), размер = 2r x 2r
+	x := center.X - r
+	y := center.Y - r
+	w := 2 * r
+	h := 2 * r
+
+	// Текст строго по центру квадрата => по центру круга
+	TextCellFormat(
+		pdf,
+		rondoWhite,
+		Font{"gotham", "B", fontSize},
+		Position{x, y},
+		CellString{w, h, text, "", 0, "CM", false, 0, ""},
+	)
 }

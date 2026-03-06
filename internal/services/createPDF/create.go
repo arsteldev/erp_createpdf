@@ -136,6 +136,7 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		"gotham-bold":         {"GothamPro-Bold.ttf", "gotham", "B"},
 		"gotham-italic":       {"GothamPro-Italic.ttf", "gotham", "I"},
 		"gotham-medium":       {"GothamPro-Medium.ttf", "gotham", "M"},
+		"gotham-light":        {"GothamPro-Light.ttf", "gotham", "L"},
 	}
 
 	// Проверяем все шрифты
@@ -202,6 +203,7 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		pdf.AddUTF8Font("gotham", "B", "GothamPro-Bold.ttf")
 		pdf.AddUTF8Font("gotham", "I", "GothamPro-Italic.ttf")
 		pdf.AddUTF8Font("gotham", "M", "GothamPro-Medium.ttf")
+		pdf.AddUTF8Font("gotham", "L", "GothamPro-Light.ttf")
 
 		// Устанавливаем шрифт по умолчанию
 		pdf.SetFont("montserrat", "", 14)
@@ -396,7 +398,7 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		if req.Firstpage.IdCompany == 2 {
 			imageEquipments(pdf, req.GetSelectequipment().GetSchema(), links["schemaEquipments"].Name, "schema", number, 1)
 		} else {
-			ImageEquipmentsRondo(pdf, req.GetSelectequipment().GetSchema(), links["schemaEquipments"].Name, "schema", strconv.Itoa(number), "1")
+			ImageEquipmentsRondo(pdf, req.GetSelectequipment().GetSchema(), links["schemaEquipments"].Name, "schema", number, 1)
 		}
 
 		pdf.AddPage()
@@ -408,7 +410,7 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		if req.Firstpage.IdCompany == 2 {
 			imageEquipments(pdf, req.GetSelectequipment().GetAccommodation(), links["accommodationEquipments"].Name, "accommodation", number, 2)
 		} else {
-			ImageEquipmentsRondo(pdf, req.GetSelectequipment().GetAccommodation(), links["accommodationEquipments"].Name, "accommodation", strconv.Itoa(number), "2")
+			ImageEquipmentsRondo(pdf, req.GetSelectequipment().GetAccommodation(), links["accommodationEquipments"].Name, "accommodation", number, 2)
 		}
 	}
 
@@ -427,7 +429,7 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 	if req.Firstpage.IdCompany == 2 {
 		_ = createModelTable(pdf, req.GetModels(), req.GetAmount(), number)
 	} else {
-		CreateModelTabel(pdf, req.GetModels(), req.GetAmount(), number, int(req.Firstpage.IdCompany))
+		CreateModelTabel(pdf, req.GetModels(), req.GetAmount(), number)
 	}
 
 	subNumber = 0
@@ -462,46 +464,54 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 	} else {
 		CreateCharacteristicRondo(pdf, req.GetModels(), req.GetModelsdata(), number, subNumber)
 	}
-	//if req.GetSpecials() {
-	//	pdf.AddPage()
-	//	tempLink = links["specials_main"]
-	//	tempLink.Page = pdf.PageNo()
-	//	links["specials_main"] = tempLink
-	//
-	//	pdf.SetLink(links["specials_main"].ID, 0, links["specials_main"].Page)
-	//
-	//	CreatePageSpecials(pdf)
-	//
-	//	for _, model := range req.GetModels() {
-	//		pdf.AddPage()
-	//		key := "specials_" + strings.ToLower(model.Name)
-	//		tempLink = links[key]
-	//		tempLink.Page = pdf.PageNo()
-	//		links[key] = tempLink
-	//
-	//		pdf.SetLink(links[key].ID, 0, links[key].Page)
-	//		CreatePageFullInformation(pdf, model)
-	//	}
-	//	//subNumber++
-	//	//createRecomendationsPage(pdf, req.GetRecomendations(), number, subNumber)
-	//	//addLink("specials_main", LinkItem{
-	//	//	ShortName: "specials_main",
-	//	//	Name:      "ПРИЛОЖЕНИЕ. ОПИСАНИЕ ОБОРУДОВАНИЯ",
-	//	//	ID:        pdf.AddLink(),
-	//	//	Page:      0,
-	//	//	Main:      true,
-	//	//})
-	//	//
-	//	//for _, model := range req.GetModels() {
-	//	//	addLink("specials_"+model.Name, LinkItem{
-	//	//		ShortName: "specials_" + model.Name,
-	//	//		Name:      model.Name + model.ShortNote,
-	//	//		ID:        pdf.AddLink(),
-	//	//		Page:      0,
-	//	//		Main:      false,
-	//	//	})
-	//	//}
-	//}
+
+	if req.GetSpecials() {
+		number++
+		pdf.AddPage()
+		tempLink = links["specials_main"]
+		tempLink.Page = pdf.PageNo()
+		links["specials_main"] = tempLink
+
+		pdf.SetLink(links["specials_main"].ID, 0, links["specials_main"].Page)
+
+		CreatePageSpecials(pdf, req.Firstpage.IdCompany, number)
+
+		for _, model := range req.GetModels() {
+			if req.Firstpage.IdCompany == 2 {
+				pdf.AddPage()
+				key := "specials_" + strings.ToLower(model.Name)
+				tempLink = links[key]
+				tempLink.Page = pdf.PageNo()
+				links[key] = tempLink
+
+				pdf.SetLink(links[key].ID, 0, links[key].Page)
+				CreatePageFullInformation(pdf, model)
+
+			} else {
+				CreatePageFullInformationRondo(pdf, model)
+			}
+
+		}
+		//subNumber++
+		//createRecomendationsPage(pdf, req.GetRecomendations(), number, subNumber)
+		//addLink("specials_main", LinkItem{
+		//	ShortName: "specials_main",
+		//	Name:      "ПРИЛОЖЕНИЕ. ОПИСАНИЕ ОБОРУДОВАНИЯ",
+		//	ID:        pdf.AddLink(),
+		//	Page:      0,
+		//	Main:      true,
+		//})
+		//
+		//for _, model := range req.GetModels() {
+		//	addLink("specials_"+model.Name, LinkItem{
+		//		ShortName: "specials_" + model.Name,
+		//		Name:      model.Name + model.ShortNote,
+		//		ID:        pdf.AddLink(),
+		//		Page:      0,
+		//		Main:      false,
+		//	})
+		//}
+	}
 
 	// 7. ВОЗВРАЩАЕМСЯ на страницу содержания для обновления номеров
 	currentPageBeforeUpdate := pdf.PageNo() // Сохраняем текущую страницу
@@ -1216,21 +1226,7 @@ func setSpecificationEquipment(pdf *gofpdf.Fpdf, idCompany, number int) {
 		pdf.MultiCell(200, 10, "СПЕЦИФИКАЦИЯ\nОБОРУДОВАНИЯ", "", "L", false)
 		break
 	case 3:
-		CreateCircle(pdf, Position{28.568, 25.658}, 8.415, greenColor)
-		TextCellFormat(
-			pdf,
-			rondoWhite,
-			Font{"gotham", "B", 28},
-			Position{24.028, 25.3},
-			CellString{1, 1, strconv.Itoa(number), "", 0, "L", false, 0, ""},
-		)
-		Text(
-			pdf,
-			rondoBlack,
-			Font{"gotham", "B", 28},
-			Position{44.929, 19.273},
-			MultiCellString{200, 10, "Спецификация оборудования", "", "L", false},
-		)
+
 		break
 	}
 }

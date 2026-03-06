@@ -49,10 +49,10 @@ type Parametrs struct {
 }
 
 type Row struct {
-	Width       float64
-	Text, Align string
-	MultiCell   bool
-	Font        Font
+	Width            float64
+	Text, Align      string
+	MultiCell, Green bool
+	Font             Font
 }
 
 type textCursor struct {
