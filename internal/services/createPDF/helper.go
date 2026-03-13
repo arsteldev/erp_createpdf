@@ -169,7 +169,7 @@ func DrawTableHeader(pdf *gofpdf.Fpdf, widths []float64, headers []string, heade
 	// 2. Теперь рисуем текст в ячейках
 	// Функция для рисования ячейки с многострочным текстом
 	drawHeaderCell := func(x, y, width, height float64, text, align string) {
-		if text == "Наименование оборудования и характеристики" {
+		if text == "Наименование оборудования и характеристики" || text == "Оборудования" || text == "Примечание" {
 			align = "L"
 		}
 		// Рассчитываем параметры для текста
@@ -621,7 +621,7 @@ func CreatePageSpecials(pdf *gofpdf.Fpdf, idCompany uint32, number int) {
 			MultiCellString{200, 10, "Приложение к коммерческому предложению", "", "L", false},
 		)
 
-		pdf.Image("mainPageLogo", 0, 67.891, pageWidth, 117.46, false, "", 0, "")
+		pdf.Image("startBig", 0, 67.891, pageWidth, 117.46, false, "", 0, "")
 
 	}
 
@@ -705,6 +705,9 @@ func CreatePageFullInformationRondo(pdf *gofpdf.Fpdf, model *createpdffile.Model
 	//Text(pdf, rondoBlack, gothamLight105, Position{X: textLeftMargin, Y: 110.842}, MultiCellString{w: 112.183, h: 10 * math, txtStr: model.Description, borderStr: "", alignStr: "L", fill: false})
 
 	Text(pdf, greenColor, gothamMedium12, Position{X: 152.739, Y: 79.777}, MultiCellString{w: 140, h: 14.4 * math, txtStr: "Технические характеристики", borderStr: "", alignStr: "L", fill: false})
+	pdf.SetY(88.279)
+	DrawTechnicalCharacteristics(pdf, model.FullInformation)
+
 	pdf.SetY(115.842)
 	for _, special := range model.Specials {
 		Text(pdf, rondoBlack, gothamLight105, Position{X: textLeftMargin, Y: -1}, MultiCellString{w: 112.183, h: 8 * math, txtStr: special.Special, borderStr: "", alignStr: "L", fill: false})
@@ -743,6 +746,90 @@ func CreatePageFullInformationRondo(pdf *gofpdf.Fpdf, model *createpdffile.Model
 
 }
 
+func DrawTechnicalCharacteristics(pdf *gofpdf.Fpdf, items []*createpdffile.FullInformation) {
+	const (
+		leftX       = 20.317
+		valueX      = 152.739
+		valueRightX = 276.521
+		lineH       = 8.0 * math
+		dotsOffset  = 2.0
+		fontSize    = 9.0
+	)
+
+	valueW := valueRightX - valueX
+	leftW := valueX - leftX
+
+	setBaseFont := func() {
+		pdf.SetFont("gotham", "", fontSize)
+	}
+
+	drawText := func(x, y, w float64, text, align string) {
+		pdf.SetXY(x, y)
+		Text(
+			pdf,
+			rondoBlack,
+			Font{"gotham", "", fontSize},
+			Position{X: valueX, Y: -1},
+			MultiCellString{
+				w:         w,
+				h:         lineH,
+				txtStr:    text,
+				borderStr: "",
+				alignStr:  align,
+				fill:      false,
+			},
+		)
+	}
+
+	for _, item := range items {
+		name := item.Name
+		value := item.Value
+
+		startY := pdf.GetY()
+
+		setBaseFont()
+
+		nameWidth := pdf.GetStringWidth(name)
+		maxNameWidth := leftW - dotsOffset*2
+		if maxNameWidth < 10 {
+			maxNameWidth = 10
+		}
+		if nameWidth > maxNameWidth {
+			nameWidth = maxNameWidth
+		}
+
+		nameLines := pdf.SplitLines([]byte(name), nameWidth)
+		valueLines := pdf.SplitLines([]byte(value), valueW)
+
+		rowLines := len(nameLines)
+		if len(valueLines) > rowLines {
+			rowLines = len(valueLines)
+		}
+		rowH := float64(rowLines) * lineH
+
+		drawText(leftX, startY, nameWidth, name, "L")
+		drawText(valueX, startY, valueW, value, "R")
+
+		if len(nameLines) == 1 {
+			realNameWidth := pdf.GetStringWidth(name)
+			dotsStartX := leftX + realNameWidth + dotsOffset
+			dotsEndX := valueX - dotsOffset
+
+			if dotsEndX > dotsStartX {
+				dotWidth := pdf.GetStringWidth(".")
+				if dotWidth > 0 {
+					dotsCount := int((dotsEndX - dotsStartX) / dotWidth)
+					if dotsCount > 0 {
+						drawText(dotsStartX, startY, dotsEndX-dotsStartX, strings.Repeat(".", dotsCount), "L")
+					}
+				}
+			}
+		}
+
+		pdf.SetXY(leftX, startY+rowH)
+	}
+}
+
 func CreateCoverPageRondo(pdf *gofpdf.Fpdf, firstPage *createpdffile.FirstPage) {
 	pdf.AddPage()
 
@@ -758,12 +845,17 @@ func CreateCoverPageRondo(pdf *gofpdf.Fpdf, firstPage *createpdffile.FirstPage) 
 
 	SetImageIntoPDF(pdf, firstPage.GetMainPageImage(), 71.929, 118.59, 225.071, 95.25, "mainPageLogo", false)
 
-	// Картинки, которые я буду использовать в AddWatermark легче было загрузить сразу, а потом только использовать по их имени.
+	// Картинки, которые я буду использовать в других страницах и легче загрузить скопом и сразу, а использовать потом.
 	// Именно поэтому они и 1 и 1 и -10, -10
-	//SetImageIntoPDF(pdf, firstPage.GetSmallCoCompanyImage(), -10, -10, 1, 1, "leftImageIntoWaterMark", false)
-	//SetImageIntoPDF(pdf, firstPage.GetCompanySmall(), -10, -10, 1, 1, "rightImageIntoWaterMark", false)
-	//// Картинка, которая нужна при описании оборудования
-	//// Именно поэтому она и 1 и 1 и -10, -10
+	SetImageIntoPDF(pdf, firstPage.GetSmallCoCompanyImage(), -10, -10, 1, 1, "equalizer", false)
+	SetImageIntoPDF(pdf, firstPage.GetStartKpImage(), -10, -10, 1, 1, "startBig", false)
+	SetImageIntoPDF(pdf, firstPage.GetCoCompanySmall(), -10, -10, 1, 1, "delivery", false)
+	SetImageIntoPDF(pdf, firstPage.GetContent(), -10, -10, 1, 1, "content", false)
+	SetImageIntoPDF(pdf, firstPage.GetPeculiarities(), -10, -10, 1, 1, "peculiarities", false)
+	if firstPage.GetCharacteristics() != nil {
+		SetImageIntoPDF(pdf, firstPage.GetCharacteristics(), -10, -10, 1, 1, "characteristics", false)
+	}
+	SetImageIntoPDF(pdf, firstPage.GetEnd(), -10, -10, 1, 1, "end", false)
 
 	// Заголовок
 	Text(
@@ -777,7 +869,7 @@ func CreateCoverPageRondo(pdf *gofpdf.Fpdf, firstPage *createpdffile.FirstPage) 
 		pdf,
 		rondoBlack,
 		Font{font: "gotham", style: "B", size: 43},
-		Position{X: -1, Y: 57},
+		Position{X: -1, Y: 65},
 		MultiCellString{w: 0, h: 38 * math, txtStr: "предложение", borderStr: "", alignStr: "L", fill: false},
 	)
 
@@ -790,44 +882,47 @@ func CreateCoverPageRondo(pdf *gofpdf.Fpdf, firstPage *createpdffile.FirstPage) 
 		Position{X: 100, Y: 42.424},
 		MultiCellString{w: 0, h: 10.8 * math, txtStr: textStr, borderStr: "", alignStr: "L", fill: false},
 	)
-	CreateRect(pdf, greenColor, RectInfo{101, 46, 48, 1, "F"})
+
+	CreateLine(pdf, greenColor, LineInfo{101, 46, 148, 46})
+
+	gothamM12 := Font{font: "gotham", style: "M", size: 12}
+	gothamR12 := Font{font: "gotham", style: "", size: 12}
+	gothamR9 := Font{font: "gotham", style: "", size: 9}
 
 	// Информация о человеке которому скидываем ПДФ
 	Text(
 		pdf,
 		color000,
-		Font{font: "gotham", style: "B", size: 12},
-		Position{X: -1, Y: 104},
+		gothamM12,
+		Position{X: -1, Y: 101.688},
 		MultiCellString{w: 0, h: 14.4 * math, txtStr: firstPage.GetContactuser().GetFullName(), borderStr: "", alignStr: "L", fill: false},
 	)
+	Text(pdf, color000, gothamR12, Position{X: -1, Y: -1}, MultiCellString{0, 16 * math, drawContactInfo(firstPage.GetContactuser()), "", "L", false})
 
-	fontInterBold12 := Font{font: "gotham", style: "B", size: 12}
-	fontInterRegular12 := Font{font: "gotham", style: "", size: 12}
-	fontInterItalic10 := Font{font: "gotham", style: "I", size: 10}
-
-	//pdf.SetFont("inter", "I", 10)
-	//pdf.SetTextColor(0, 0, 0)
-	//drawContactInfo(firstPage.GetContactuser())
-	Text(pdf, color000, fontInterItalic10, Position{X: -1, Y: -1}, MultiCellString{0, 12 * math, drawContactInfo(firstPage.GetContactuser()), "", "L", false})
 	// Объект
-	TextCellFormat(pdf, color000, fontInterBold12, Position{X: 99.451, Y: 101.688}, CellString{0, 14.4 * math, "Объект:", "", 1, "L", false, 0, ""})
-	TextCellFormat(pdf, color000, fontInterRegular12, Position{X: 99.451, Y: 105.688}, CellString{0, 14.4 * math, firstPage.GetObject(), "", 1, "L", false, 0, ""})
+	TextCellFormat(pdf, color000, gothamM12, Position{X: 99.451, Y: 101.688}, CellString{0, 14.4 * math, "Объект:", "", 1, "L", false, 0, ""})
+	TextCellFormat(pdf, color000, gothamR12, Position{X: 99.451, Y: 105.688}, CellString{0, 14.4 * math, firstPage.GetObject(), "", 1, "L", false, 0, ""})
 
 	// Кто выполнил (Менеджер)
-	TextCellFormat(pdf, color000, fontInterBold12, Position{X: -1, Y: 120.779}, CellString{0, 14.4 * math, "Выполнил:", "", 1, "L", false, 0, ""})
-	TextCellFormat(pdf, color000, fontInterRegular12, Position{X: -1, Y: 124.779}, CellString{0, 14.4 * math, firstPage.GetWhocreate().GetFullName(), "", 1, "L", false, 0, ""})
-	//TextCellFormat(pdf, color000, fontInterItalic10, Position{X: -1, Y: -1}, CellString{0, 12 * math, firstPage.GetWhocreate().GetOccupy(), "", 1, "L", false, 0, ""})
+	TextCellFormat(pdf, color000, gothamM12, Position{X: -1, Y: 120.779}, CellString{0, 14.4 * math, "Выполнил:", "", 1, "L", false, 0, ""})
+	TextCellFormat(pdf, color000, gothamM12, Position{X: -1, Y: 124.779}, CellString{0, 14.4 * math, firstPage.GetWhocreate().GetFullName(), "", 1, "L", false, 0, ""})
+	TextCellFormat(pdf, color000, gothamR9, Position{X: -1, Y: 129.779}, CellString{0, 10.8 * math, firstPage.GetWhocreate().GetOccupy(), "", 1, "L", false, 0, ""})
 
 	// Контактная информация
-	TextCellFormat(pdf, greenColor, fontInterBold12, Position{X: -1, Y: 148.625}, CellString{0, 14.4 * math, "Контакты:", "", 1, "L", false, 0, ""})
+	TextCellFormat(pdf, greenColor, gothamM12, Position{X: -1, Y: 148.625}, CellString{0, 14.4 * math, "Контакты:", "", 1, "L", false, 0, ""})
 
 	contactText := firstPage.GetContacts().GetPhone() + "\n" + firstPage.GetContacts().GetEmail() + "\n" + site
-	Text(pdf, color000, fontInterRegular12, Position{X: -1, Y: 153.625}, MultiCellString{0, 14.4 * math, contactText, "", "L", false})
+	Text(pdf, color000, gothamR12, Position{X: -1, Y: 152.625}, MultiCellString{0, 14.4 * math, contactText, "", "L", false})
 }
 
 func CreateRect(pdf *gofpdf.Fpdf, color RGBColor, rectInfo RectInfo) {
 	pdf.SetFillColor(color.R, color.G, color.B)
 	pdf.Rect(rectInfo.x, rectInfo.y, rectInfo.w, rectInfo.h, rectInfo.styleStr)
+}
+
+func CreateLine(pdf *gofpdf.Fpdf, color RGBColor, lineInfo LineInfo) {
+	pdf.SetDrawColor(color.R, color.G, color.B)
+	pdf.Line(lineInfo.x1, lineInfo.y1, lineInfo.x2, lineInfo.y2)
 }
 
 func CreateRoundedRect(pdf *gofpdf.Fpdf, color RGBColor, roundedRectInfo RoundedRectInfo) {
@@ -861,8 +956,8 @@ func CreateSystemFeaturesRondo(pdf *gofpdf.Fpdf, features []*createpdffile.Syste
 		items = append(items, f.GetFeature())
 	}
 
-	if pdf.GetImageInfo("appendix") != nil {
-		pdf.Image("appendix", 156.45, 112.055, 140.55, 61.8, false, "", 0, "")
+	if pdf.GetImageInfo("peculiarities") != nil {
+		pdf.Image("peculiarities", 156.45, 112.055, 140.55, 61.8, false, "", 0, "")
 	}
 
 	DrawNumberedListWordLikeRondo(pdf, items)
@@ -870,94 +965,218 @@ func CreateSystemFeaturesRondo(pdf *gofpdf.Fpdf, features []*createpdffile.Syste
 	AddWatermarkRondo(pdf)
 }
 
+//	func DrawNumberedListWordLikeRondo(pdf *gofpdf.Fpdf, items []string) {
+//		pdf.SetAutoPageBreak(false, 0)
+//
+//		pageW, pageH := pdf.GetPageSize()
+//
+//		const (
+//			startNumX = 20.718
+//			startY    = 55.449
+//
+//			sidePad = 20.317
+//			colGap  = 8.0
+//
+//			lineH      = 7.0
+//			paraSpace  = 3.0
+//			numW       = 8.0
+//			numTextGap = 3.0
+//
+//			leftColHeight = 190.0
+//		)
+//
+//		usableW := pageW - 2*sidePad
+//		colW := (usableW - colGap) / 2
+//
+//		colX1 := startNumX
+//		colX2 := colX1 + colW + colGap
+//
+//		bottomY1 := startY + leftColHeight
+//		bottomY2 := pageH - 20.0
+//
+//		textW := colW - (numW + numTextGap)
+//
+//		curCol := 0
+//		x0 := colX1
+//		y := startY
+//
+//		baseFont := Font{"gotham", "", 12}
+//
+//		pdf.SetFont(baseFont.font, baseFont.style, baseFont.size)
+//
+//		for i, text := range items {
+//			pdf.SetFont(baseFont.font, baseFont.style, baseFont.size)
+//
+//			lines := pdf.SplitLines([]byte(text), textW)
+//			needH := float64(len(lines))*lineH + paraSpace
+//
+//			bottomY := bottomY1
+//			if curCol == 1 {
+//				bottomY = bottomY2
+//			}
+//
+//			if y+needH > bottomY {
+//				if curCol == 0 {
+//					curCol = 1
+//					x0 = colX2
+//					y = startY
+//					AddWatermarkRondo(pdf)
+//				} else {
+//					pdf.AddPage()
+//					pdf.SetAutoPageBreak(false, 0)
+//					pdf.SetFont(baseFont.font, baseFont.style, baseFont.size)
+//
+//					if pdf.GetImageInfo("appendix") != nil {
+//						pdf.Image("appendix", 156.45, 112.055, 140.55, 61.8, false, "", 0, "")
+//					}
+//
+//					curCol = 0
+//					x0 = colX1
+//					y = startY
+//				}
+//			}
+//
+//			TextCellFormat(
+//				pdf, rondoBlack, baseFont,
+//				Position{x0, y},
+//				CellString{numW, lineH, strconv.Itoa(i+1) + ".", "", 0, "", false, 0, ""},
+//			)
+//
+//			Text(
+//				pdf, rondoBlack, baseFont,
+//				Position{x0 + numW + numTextGap, y},
+//				MultiCellString{textW, lineH, text, "", "", false},
+//			)
+//
+//			pdf.SetXY(x0, pdf.GetY())
+//			y = pdf.GetY() + paraSpace
+//		}
+//	}
 func DrawNumberedListWordLikeRondo(pdf *gofpdf.Fpdf, items []string) {
 	pdf.SetAutoPageBreak(false, 0)
 
-	pageW, pageH := pdf.GetPageSize()
+	pageW, _ := pdf.GetPageSize()
 
 	const (
-		startNumX = 20.718
-		startY    = 55.449
+		startY = 55.449
 
-		sidePad = 20.317
-		colGap  = 8.0
+		// Координаты колонок
+		leftX  = 20.718
+		rightX = 151.187
 
-		lineH      = 7.0
-		paraSpace  = 3.0
-		numW       = 8.0
-		numTextGap = 3.0
+		// Нижние границы колонок
+		leftBottomY  = 180.0
+		rightBottomY = 110.0
 
-		leftColHeight = 190.0
+		// Отступ справа от края страницы
+		rightPad = 20.317
+
+		// Параметры списка
+		numW      = 8.0
+		numGap    = 3.0
+		lineH     = 7.0
+		paraSpace = 3.0
+		fontSize  = 12.0
 	)
 
-	usableW := pageW - 2*sidePad
-	colW := (usableW - colGap) / 2
+	pdf.SetFont("gotham", "", fontSize)
+	pdf.SetTextColor(rondoBlack.R, rondoBlack.G, rondoBlack.B)
 
-	colX1 := startNumX
-	colX2 := colX1 + colW + colGap
+	type column struct {
+		x       float64
+		textW   float64
+		bottomY float64
+	}
 
-	bottomY1 := startY + leftColHeight
-	bottomY2 := pageH - 80.0
+	leftCol := column{
+		x:       leftX,
+		textW:   (rightX - leftX) - numW - numGap,
+		bottomY: leftBottomY,
+	}
 
-	textW := colW - (numW + numTextGap)
+	rightCol := column{
+		x:       rightX,
+		textW:   (pageW - rightPad - rightX) - numW - numGap,
+		bottomY: rightBottomY,
+	}
 
-	curCol := 0
-	x0 := colX1
+	if leftCol.textW <= 0 || rightCol.textW <= 0 {
+		return
+	}
+
+	addNewPage := func() {
+		pdf.AddPage()
+		pdf.SetAutoPageBreak(false, 0)
+		pdf.SetFont("gotham", "", fontSize)
+		pdf.SetTextColor(rondoBlack.R, rondoBlack.G, rondoBlack.B)
+
+		if pdf.GetImageInfo("peculiarities") != nil {
+			pdf.Image("peculiarities", 156.45, 112.055, 140.55, 61.8, false, "", 0, "")
+		}
+	}
+
+	measureHeight := func(text string, textW float64) float64 {
+		// ВАЖНО: для UTF-8 текста нужен SplitText, а не SplitLines
+		lines := pdf.SplitText(text, textW)
+		if len(lines) == 0 {
+			return lineH + paraSpace
+		}
+		return float64(len(lines))*lineH + paraSpace
+	}
+
+	drawItem := func(col column, y float64, idx int, text string) {
+		// номер
+		pdf.SetXY(col.x, y)
+		pdf.CellFormat(numW, lineH, strconv.Itoa(idx)+".", "", 0, "L", false, 0, "")
+
+		// текст
+		pdf.SetXY(col.x+numW+numGap, y)
+		pdf.MultiCell(col.textW, lineH, text, "", "L", false)
+	}
+
+	curCol := leftCol
+	inRightCol := false
 	y := startY
 
-	baseFont := Font{"gotham", "", 12}
+	for i, item := range items {
+		blockH := measureHeight(item, curCol.textW)
 
-	pdf.SetFont(baseFont.font, baseFont.style, baseFont.size)
-
-	for i, text := range items {
-		pdf.SetFont(baseFont.font, baseFont.style, baseFont.size)
-
-		lines := pdf.SplitLines([]byte(text), textW)
-		needH := float64(len(lines))*lineH + paraSpace
-
-		bottomY := bottomY1
-		if curCol == 1 {
-			bottomY = bottomY2
-		}
-
-		if y+needH > bottomY {
-			if curCol == 0 {
-				curCol = 1
-				x0 = colX2
+		// Если не влезает в текущую колонку
+		if y+blockH > curCol.bottomY {
+			if !inRightCol {
+				// Переход в правую колонку
+				curCol = rightCol
+				inRightCol = true
 				y = startY
-				AddWatermarkRondo(pdf)
-			} else {
-				pdf.AddPage()
-				pdf.SetAutoPageBreak(false, 0)
-				pdf.SetFont(baseFont.font, baseFont.style, baseFont.size)
 
-				if pdf.GetImageInfo("appendix") != nil {
-					pdf.Image("appendix", 156.45, 112.055, 140.55, 61.8, false, "", 0, "")
+				blockH = measureHeight(item, curCol.textW)
+
+				// Если в правую не влезает — новая страница
+				if y+blockH > curCol.bottomY {
+					addNewPage()
+					curCol = leftCol
+					inRightCol = false
+					y = startY
+
+					blockH = measureHeight(item, curCol.textW)
+				} else {
+					AddWatermarkRondo(pdf)
 				}
-
-				curCol = 0
-				x0 = colX1
+			} else {
+				// Правая колонка закончилась — новая страница
+				addNewPage()
+				curCol = leftCol
+				inRightCol = false
 				y = startY
+
+				blockH = measureHeight(item, curCol.textW)
 			}
 		}
 
-		TextCellFormat(
-			pdf, rondoBlack, baseFont,
-			Position{x0, y},
-			CellString{numW, lineH, strconv.Itoa(i+1) + ".", "", 0, "", false, 0, ""},
-		)
-
-		Text(
-			pdf, rondoBlack, baseFont,
-			Position{x0 + numW + numTextGap, y},
-			MultiCellString{textW, lineH, text, "", "", false},
-		)
-
-		pdf.SetXY(x0, pdf.GetY())
-		y = pdf.GetY() + paraSpace
+		drawItem(curCol, y, i+1, item)
+		y += blockH
 	}
 }
-
 func DrawNumberedListWordLike(pdf *gofpdf.Fpdf, items []string, leftPad, rightPad, startY float64) {
 	pageW, _ := pdf.GetPageSize()
 	blockW := pageW - leftPad - rightPad
@@ -1244,6 +1463,11 @@ func CreateTableOfContentsRondo(pdf *gofpdf.Fpdf, tableStartPage, characteristic
 	CreateRoundedRect(pdf, rondoLightBeige, RoundedRectInfo{0, 24.327, 5, 41.416, 3.0, "23", "F"})
 
 	AddWatermarkRondo(pdf)
+
+	if pdf.GetImageInfo("content") != nil {
+		pdf.Image("content", 126.6, 87.7, 170.392, 106.539, false, "", 0, "")
+	}
+
 }
 
 func CreateCircle(pdf *gofpdf.Fpdf, position Position, radius float64, color RGBColor) {
@@ -1347,8 +1571,8 @@ func SelectsEquipmentsRondo(pdf *gofpdf.Fpdf, text string, number int) {
 		rightLines := cur.fillLines(pdf, rightW, int(rightMaxLines))
 		drawLinesColumn(pdf, rightX, rightStartY, rightW, lineH, rightLines, true)
 
-		if pdf.GetImageInfo("appendix") != nil {
-			pdf.Image("appendix", 173, 134.739, 88.35, 43.468, false, "", 0, "")
+		if pdf.GetImageInfo("equalizer") != nil {
+			pdf.Image("equalizer", 173, 134.739, 88.35, 43.468, false, "", 0, "")
 		}
 
 		AddWatermarkRondo(pdf)
@@ -2061,6 +2285,12 @@ func CreateCharacteristicRondo(pdf *gofpdf.Fpdf, additionallyEquipment []*create
 	}
 
 	powerDataPDFRondo(pdf, powerData2, labelWidth, valueWidth)
+
+	if pdf.GetImageInfo("characteristics") != nil {
+		pdf.Image("characteristics", 180.274, 49.904, 121, 134.862, false, "", 0, "")
+
+	}
+
 	AddWatermarkRondo(pdf)
 }
 
@@ -2156,4 +2386,287 @@ func DrawNumberInCircle(pdf *gofpdf.Fpdf, center Position, r float64, fontSize f
 		Position{x, y},
 		CellString{w, h, text, "", 0, "CM", false, 0, ""},
 	)
+}
+
+func DrawNumberAndText(pdf *gofpdf.Fpdf, number, subnumber int, text1, text2 string) {
+	DrawNumberInCircle(pdf, Position{28.568, 25.658}, 8.415, 24, number, subnumber)
+	if text2 != "" {
+		Text(pdf, rondoBlack, Font{"gotham", "B", 28}, Position{44.929, 17.603}, MultiCellString{200, 10, text1, "", "L", false})
+		Text(pdf, rondoBlack, Font{"gotham", "M", 12}, Position{44.929, 28.511}, MultiCellString{200, 10, text2, "", "L", false})
+	}
+}
+
+func CreateRecomendationsPageRondo(pdf *gofpdf.Fpdf, recomendations []*createpdffile.Recomendations, number, subNumber int) {
+	defer AddWatermarkRondo(pdf)
+
+	DrawNumberInCircle(pdf, Position{28.568, 25.658}, 8.415, 24, number, subNumber)
+
+	Text(
+		pdf,
+		rondoBlack,
+		Font{"gotham", "B", 24},
+		Position{44.929, 17.603},
+		MultiCellString{200, 10, "Рекомендации по дополнительному\nоборудованию системы", "", "L", false},
+	)
+
+	//positionX := 32
+	//pdf.SetLeftMargin(float64(positionX))
+	//
+	//font := Font{
+	//	font:  "montserrat",
+	//	style: "",
+	//	size:  24,
+	//}
+	//
+	//color := RGBColor{R: 37, G: 36, B: 36}
+	//
+	//TextCellFormat(pdf, RGBColor{R: 237, G: 114, B: 3}, font,
+	//	Position{X: -1, Y: 17},
+	//	CellString{w: 0, h: 24 * math, txtStr: strconv.Itoa(number) + "." + strconv.Itoa(subNumber), borderStr: "", ln: 0, alignStr: "L", fill: false, link: 0, linkStr: ""},
+	//)
+	//
+	//TextCellFormat(pdf, color, font,
+	//	Position{X: float64(positionX + 2), Y: 17},
+	//	CellString{w: 0, h: 24 * math, txtStr: strings.Repeat(" ", 5) + "Рекомендации по дополнительному", borderStr: "", ln: 0, alignStr: "L", fill: false, link: 0, linkStr: ""},
+	//)
+
+	//TextCellFormat(pdf, color, font,
+	//	Position{X: -1, Y: 25},
+	//	CellString{w: 0, h: 24 * math, txtStr: "оборудованию системы", borderStr: "", ln: 0, alignStr: "L", fill: false, link: 0, linkStr: ""},
+	//)
+
+	headers := []string{
+		"№",
+		"Оборудования",
+		"Кол-во, шт.",
+		"Примечание",
+	}
+
+	rows := make([][]Row, len(recomendations))
+	var wg sync.WaitGroup
+	wg.Add(len(recomendations))
+
+	tableWidths = []float64{
+		14 + 1.403,
+		70 + 1.403,
+		28.326 + 1.403,
+		130,
+	}
+
+	headerH := 10
+	rowBaseH := 12.4
+
+	leftMargin := 20.25
+
+	font9 := Font{"gotham", "", 9}
+	font105 := Font{"gotham", "", 10.5}
+	fontM10 := Font{"gotham", "M", 10}
+
+	for i, r := range recomendations {
+		i, r := i, r
+		go func() {
+			defer wg.Done()
+
+			rows[i] = []Row{
+				{Width: tableWidths[0], Text: strconv.Itoa(i + 1), Align: "C", Font: fontM10},
+				{Width: tableWidths[1], Text: r.GetName(), Align: "L", Font: font9},
+				{Width: tableWidths[2], Text: strconv.Itoa(int(r.GetCount())), Align: "C", Font: font105},
+				{Width: tableWidths[3], Text: r.GetDescription(), Align: "L", Font: font9},
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	DrawTableHeader(
+		pdf,
+		tableWidths,
+		headers,
+		float64(headerH),
+		leftMargin,
+		false,
+		Font{"gotham", "M", 9.5},
+		RGBColor{140, 121, 104},
+	)
+
+	countOn := 11
+	count := 0
+	startX, startY := pdf.GetX(), pdf.GetY()
+	newPageY := startY
+	for i, row := range rows {
+		if count == countOn {
+			pdf.AddPage()
+			DrawTableHeader(
+				pdf,
+				tableWidths,
+				headers,
+				float64(headerH),
+				leftMargin,
+				false,
+				Font{"gotham", "M", 9.5},
+				RGBColor{140, 121, 104},
+			)
+			startY = newPageY
+			AddWatermarkRondo(pdf)
+		}
+
+		backGroudColor := rondoWhite
+		if i%2 == 0 {
+			backGroudColor = rondoLightBeige
+		}
+
+		DrawRow(pdf, row, backGroudColor, startX, startY, rowBaseH)
+		count++
+		startY += rowBaseH
+		if i == len(rows)-1 {
+			if count == countOn {
+				pdf.AddPage()
+				DrawTableHeader(
+					pdf,
+					tableWidths,
+					headers,
+					float64(headerH),
+					leftMargin,
+					false,
+					Font{"gotham", "M", 9.5},
+					RGBColor{140, 121, 104},
+				)
+				startY = newPageY
+				AddWatermarkRondo(pdf)
+			}
+		}
+	}
+
+	//DrawTableHeader(pdf, tableWidthRecomendation, headers, 16.932, 0, true, Font{"Inter", "B", 9.5}, RGBColor{R: 61, G: 74, B: 77})
+	//
+	//rows := make([][]Row, len(recomendations))
+	//
+	//var wg sync.WaitGroup
+	//wg.Add(len(recomendations))
+	//
+	//for i, r := range recomendations {
+	//	i, r := i, r
+	//	go func() {
+	//		defer wg.Done()
+	//
+	//		rows[i] = []Row{
+	//			{Width: tableWidthRecomendation[0], Text: strconv.Itoa(i + 1), Align: "L"},
+	//			{Width: tableWidthRecomendation[1], Text: r.GetName(), Align: "L"},
+	//			{Width: tableWidthRecomendation[2], Text: strconv.Itoa(int(r.GetCount())), Align: "L"},
+	//			{Width: tableWidthRecomendation[3], Text: r.GetDescription(), Align: "L"},
+	//		}
+	//	}()
+	//}
+	//
+	//wg.Wait()
+	//
+	//DrawTableRows(pdf, rows, 16.932, 36.686, 0, 3, 4)
+	//
+	//AddWatermark(pdf)
+}
+
+func CreateByePageRondo(pdf *gofpdf.Fpdf, contacts *createpdffile.Contacts, whoCreate *createpdffile.WhoCreate) {
+	pdf.AddPage()
+
+	pdf.Image("appendix", 0, 0, 45.7, 210, false, "", 0, "")
+	pdf.Image("end", 0, 65.058, 153.811, 122.061, false, "", 0, "")
+
+	pdf.Image("logoRondo", 165.471, 16.243, 25.07, 26.71, false, "", 0, "")
+	pdf.Image("logoLDA", 214.754, 22.243, 46, 15.8, false, "", 0, "")
+
+	Text(pdf, greenColor, Font{font: "gotham", style: "M", size: 29}, Position{X: 173.125, Y: 61.437}, MultiCellString{0, 14.4 * math, "Готовы ответить", "", "L", false})
+	Text(pdf, rondoBlack, Font{font: "gotham", style: "M", size: 29}, Position{X: 168.537, Y: 73.668}, MultiCellString{0, 14.4 * math, "на ваши вопросы", "", "L", false})
+
+	CreateRoundedRect(pdf, rondoLightBeige, RoundedRectInfo{
+		x:        168.537,
+		y:        86.806,
+		w:        92.224,
+		h:        46.611,
+		r:        2,
+		corners:  "1234",
+		styleStr: "F",
+	})
+
+	contactText := contacts.GetPhone() + "\n" + contacts.GetEmail() + "\n" + site
+	Text(pdf, rondoBlack, Font{font: "gotham", style: "", size: 11}, Position{X: 187.735, Y: 114.011}, MultiCellString{0, 14.4 * math, contactText, "", "L", false})
+
+	pdf.Image("equalizer", 187.735, 94.388, 15.522, 13.758, false, "", 0, "")
+
+	Text(pdf, rondoBlack, Font{font: "gotham", style: "", size: 11}, Position{X: 208.257, Y: 99.868}, MultiCellString{0, 14.4 * math, "Ваш менеджер", "", "L", false})
+	Text(pdf, rondoBlack, Font{font: "gotham", style: "M", size: 12}, Position{X: 208.257, Y: 104.714}, MultiCellString{0, 14.4 * math, whoCreate.GetFullName(), "", "L", false})
+}
+
+func CreateDeliveryRondo(pdf *gofpdf.Fpdf, number int) {
+	defer AddWatermarkRondo(pdf)
+	DrawNumberAndText(pdf, number, 0, "Условия поставки", "Приложение к коммерческому предложению")
+	X := 42.926
+	textX := 58.273
+	CreateRoundedRect(pdf, rondoLightBeige, RoundedRectInfo{
+		x:        X,
+		y:        43.89,
+		w:        193.653,
+		h:        20.19,
+		r:        2,
+		corners:  "1234",
+		styleStr: "F",
+	})
+
+	Text(pdf, rondoBlack, Font{"gotham", "", 12}, Position{textX, 49.283}, MultiCellString{
+		w:         190,
+		h:         17 * math,
+		txtStr:    "Коммерческое предложение действительно при условии изменения курсов\nвалют не более 3% от курсов, установленных ЦБ РФ на дату выставления КП.",
+		borderStr: "", alignStr: "L", fill: false,
+	})
+
+	CreateRoundedRect(pdf, rondoLightBeige, RoundedRectInfo{
+		x:        X,
+		y:        69.722,
+		w:        89.205,
+		h:        25.938,
+		r:        2,
+		corners:  "1234",
+		styleStr: "F",
+	})
+
+	Text(pdf, rondoBlack, Font{"gotham", "", 12}, Position{textX, 75.224}, MultiCellString{
+		w:         68.95,
+		h:         17 * math,
+		txtStr:    "Срок поставки оборудования\nпод заказ - 3 месяца\nс момента оплаты счета.",
+		borderStr: "", alignStr: "L", fill: false,
+	})
+
+	CreateRoundedRect(pdf, rondoLightBeige, RoundedRectInfo{
+		x:        X,
+		y:        101.315,
+		w:        89.325,
+		h:        25.938,
+		r:        2,
+		corners:  "1234",
+		styleStr: "F",
+	})
+
+	Text(pdf, rondoBlack, Font{"gotham", "", 12}, Position{textX, 107.033}, MultiCellString{
+		w:         64.674,
+		h:         17 * math,
+		txtStr:    "Гарантийный срок\nна оборудование\nсоставляет 12 месяцев",
+		borderStr: "", alignStr: "L", fill: false,
+	})
+
+	Text(pdf, rondoBlack, Font{"gotham", "", 12}, Position{44.929, 141.345}, MultiCellString{
+		w:         210,
+		h:         15 * math,
+		txtStr:    "По условиям договора поставка осуществляется при 100% предоплате со склада\nв Санкт-Петербурге. Цены указаны с учетом НДС 22%.",
+		borderStr: "", alignStr: "L", fill: false,
+	})
+
+	pdf.Image("delivery", 146.413, 68.283, 71.05, 64.08, false, "", 0, "")
+}
+
+func CreateProfSoundRondo(pdf *gofpdf.Fpdf, number int, profSound *createpdffile.ProfSound) {
+	defer AddWatermarkRondo(pdf)
+	DrawNumberAndText(pdf, number, 0, "Расчет емкости АКБ", "Приложение к коммерческому предложению")
+
+	pageWidth, _ := pdf.GetPageSize()
+
+	SetImageIntoPDF(pdf, profSound.GetAkb(), 26.153, 52.551, pageWidth-(2*26.153), 123.29, "akb", false)
 }

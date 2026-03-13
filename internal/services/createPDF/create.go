@@ -343,6 +343,29 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		}
 	}
 
+	if req.Firstpage.IdCompany == 3 {
+		number++
+		addLink("delivery", LinkItem{
+			ShortName: "delivery",
+			Name:      strconv.Itoa(number) + ". " + "Условие поставки",
+			ID:        pdf.AddLink(),
+			Page:      0,
+			Main:      true,
+		})
+		//pdf.AddPage()
+		//CreateByePageRondo(pdf, number, req.GetFirstpage().GetContacts(), req.GetFirstpage().GetWhocreate())
+	}
+
+	if req.GetProfsound() != nil {
+		number++
+		addLink("profSound", LinkItem{
+			ShortName: "profSound",
+			Name:      strconv.Itoa(number) + ". " + "Расчет емкости АКБ",
+			ID:        pdf.AddLink(),
+			Page:      0,
+			Main:      true,
+		})
+	}
 	//specLink := pdf.AddLink() // Ссылка на спецификацию оборудования
 	//charLink := pdf.AddLink() // Ссылка на характеристики системы
 
@@ -444,6 +467,8 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		subNumber++
 		if req.Firstpage.IdCompany == 2 {
 			createRecomendationsPage(pdf, req.GetRecomendations(), number, subNumber)
+		} else {
+			CreateRecomendationsPageRondo(pdf, req.GetRecomendations(), number, subNumber)
 		}
 	}
 
@@ -513,6 +538,20 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		//}
 	}
 
+	// COMMIT HERE
+	//if req.Firstpage.IdCompany == 3 {
+	//	number++
+	//	pdf.AddPage()
+	//	tempLink = links["delivery"]
+	//	tempLink.Page = pdf.PageNo()
+	//	links["delivery"] = tempLink
+	//
+	//	pdf.SetLink(links["delivery"].ID, 0, links["delivery"].Page)
+	//	CreateDeliveryRondo(pdf, number)
+	//
+	//	CreateByePageRondo(pdf, req.GetFirstpage().GetContacts(), req.GetFirstpage().GetWhocreate())
+	//}
+
 	// 7. ВОЗВРАЩАЕМСЯ на страницу содержания для обновления номеров
 	currentPageBeforeUpdate := pdf.PageNo() // Сохраняем текущую страницу
 	pdf.SetPage(tocPageNum)                 // Переходим на страницу содержания
@@ -537,7 +576,8 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 
 	} else {
 		s.Log.Warn("Побывал тут в Рондо" + strconv.Itoa(int(req.Firstpage.IdCompany)))
-		CreateTableOfContentsRondo(pdf, links["tabelModel"].Page, links["characteristics"].Page, links, order)
+		// COMMIT HERE
+		//CreateTableOfContentsRondo(pdf, links["tabelModel"].Page, links["characteristics"].Page, links, order)
 	}
 
 	// 8. ВАЖНО: Возвращаемся на последнюю страницу
@@ -792,6 +832,16 @@ func createModelTable(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 		break
 	}
 
+	var tWidths = []float64{
+		10,  // № (шире для двузначных номеров)
+		100, // Наименование - ОЧЕНЬ широкая в горизонтали!
+		11,  // Кол-во шт.
+		27,  // Цена
+		27,  // Сумма
+		16,  // Наличие
+		41,  // Фото (можно сделать побольше для фото)
+	}
+
 	// Настройка PDF
 	pdf.SetLeftMargin(32)
 	pdf.SetRightMargin(32)
@@ -801,7 +851,7 @@ func createModelTable(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 	setSpecificationEquipment(pdf, 2, number)
 	pdf.SetY(50)
 	AddWatermark(pdf)
-	drawTableHeaderForLandscape(pdf, tableWidths, 16.932)
+	drawTableHeaderForLandscape(pdf, tWidths, 16.932)
 
 	pdf.SetDrawColor(180, 180, 180)
 	pdf.SetLineWidth(0.3)
@@ -813,7 +863,7 @@ func createModelTable(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 	for i := 0; i < totalModels && i < firstPageLimit; i++ {
 		rowColor := getRowColor(i)
 		pdf.SetFillColor(rowColor.R, rowColor.G, rowColor.B)
-		drawTableRow(pdf, i, pictures[i], tableWidths, i%2 == 0)
+		drawTableRow(pdf, i, pictures[i], tWidths, i%2 == 0)
 		if pictures[i].GetPresence() == "Заказ" {
 			needText = "По условиям договора поставка осуществляется при 100% предоплате со склада в Санкт-Петербурге.\nЦены указаны с учетом НДС 22%. Срок поставки оборудования под заказ  –  3 месяца с момента оплаты счета."
 		}
@@ -835,7 +885,7 @@ func createModelTable(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 		// Только шапка на странице с итогами
 		AddWatermark(pdf)
 		pdf.SetY(20)
-		drawTableHeaderForLandscape(pdf, tableWidths, 14.11)
+		drawTableHeaderForLandscape(pdf, tWidths, 14.11)
 		createSumm(pdf, amount, true, needRub, needText)
 		return 2
 	}
@@ -850,13 +900,13 @@ func createModelTable(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 			pdf.AddPage()
 			tablePageNumber++
 			pdf.SetY(17)
-			drawTableHeaderForLandscape(pdf, tableWidths, 14.11)
+			drawTableHeaderForLandscape(pdf, tWidths, 14.11)
 			AddWatermark(pdf)
 		}
 
 		rowColor := getRowColor(modelsOnCurrentPage)
 		pdf.SetFillColor(rowColor.R, rowColor.G, rowColor.B)
-		drawTableRow(pdf, i, pictures[i], tableWidths, modelsOnCurrentPage%2 == 0)
+		drawTableRow(pdf, i, pictures[i], tWidths, modelsOnCurrentPage%2 == 0)
 		if pictures[i].GetPresence() == "Заказ" {
 			needText = "По условиям договора поставка осуществляется при 100% предоплате со склада в Санкт-Петербурге.\nЦены указаны с учетом НДС 20%. Срок поставки оборудования под заказ  –  3 месяца с момента оплаты счета."
 		}
@@ -870,7 +920,7 @@ func createModelTable(pdf *gofpdf.Fpdf, pictures []*createpdffile.Models, amount
 				pdf.AddPage()
 				tablePageNumber++
 				pdf.SetY(20)
-				drawTableHeaderForLandscape(pdf, tableWidths, 14.11)
+				drawTableHeaderForLandscape(pdf, tWidths, 14.11)
 				AddWatermark(pdf)
 			}
 			modelsOnCurrentPage = 0

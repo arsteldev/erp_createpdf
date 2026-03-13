@@ -8,6 +8,10 @@ type RectInfo struct {
 	styleStr   string
 }
 
+type LineInfo struct {
+	x1, y1, x2, y2 float64
+}
+
 type RoundedRectInfo struct {
 	x, y, w, h, r     float64
 	corners, styleStr string
