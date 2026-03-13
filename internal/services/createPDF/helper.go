@@ -855,7 +855,9 @@ func CreateCoverPageRondo(pdf *gofpdf.Fpdf, firstPage *createpdffile.FirstPage) 
 	if firstPage.GetCharacteristics() != nil {
 		SetImageIntoPDF(pdf, firstPage.GetCharacteristics(), -10, -10, 1, 1, "characteristics", false)
 	}
-	SetImageIntoPDF(pdf, firstPage.GetEnd(), -10, -10, 1, 1, "end", false)
+	if firstPage.GetEnd() != nil {
+		SetImageIntoPDF(pdf, firstPage.GetEnd(), -10, -10, 1, 1, "end_images_123456", false)
+	}
 
 	// Заголовок
 	Text(
@@ -1126,10 +1128,14 @@ func DrawNumberedListWordLikeRondo(pdf *gofpdf.Fpdf, items []string) {
 
 	drawItem := func(col column, y float64, idx int, text string) {
 		// номер
+		pdf.SetFont("gotham", "", fontSize)
+		pdf.SetTextColor(rondoBlack.R, rondoBlack.G, rondoBlack.B)
 		pdf.SetXY(col.x, y)
 		pdf.CellFormat(numW, lineH, strconv.Itoa(idx)+".", "", 0, "L", false, 0, "")
 
 		// текст
+		pdf.SetFont("gotham", "", fontSize)
+		pdf.SetTextColor(rondoBlack.R, rondoBlack.G, rondoBlack.B)
 		pdf.SetXY(col.x+numW+numGap, y)
 		pdf.MultiCell(col.textW, lineH, text, "", "L", false)
 	}
@@ -2569,7 +2575,7 @@ func CreateByePageRondo(pdf *gofpdf.Fpdf, contacts *createpdffile.Contacts, whoC
 	pdf.AddPage()
 
 	pdf.Image("appendix", 0, 0, 45.7, 210, false, "", 0, "")
-	pdf.Image("end", 0, 65.058, 153.811, 122.061, false, "", 0, "")
+	//pdf.Image("end_images_123456", 0, 65.058, 153.811, 122.061, false, "", 0, "")
 
 	pdf.Image("logoRondo", 165.471, 16.243, 25.07, 26.71, false, "", 0, "")
 	pdf.Image("logoLDA", 214.754, 22.243, 46, 15.8, false, "", 0, "")

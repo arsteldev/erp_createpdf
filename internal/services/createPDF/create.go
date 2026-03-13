@@ -538,19 +538,18 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 		//}
 	}
 
-	// COMMIT HERE
-	//if req.Firstpage.IdCompany == 3 {
-	//	number++
-	//	pdf.AddPage()
-	//	tempLink = links["delivery"]
-	//	tempLink.Page = pdf.PageNo()
-	//	links["delivery"] = tempLink
-	//
-	//	pdf.SetLink(links["delivery"].ID, 0, links["delivery"].Page)
-	//	CreateDeliveryRondo(pdf, number)
-	//
-	//	CreateByePageRondo(pdf, req.GetFirstpage().GetContacts(), req.GetFirstpage().GetWhocreate())
-	//}
+	if req.Firstpage.IdCompany == 3 {
+		number++
+		pdf.AddPage()
+		tempLink = links["delivery"]
+		tempLink.Page = pdf.PageNo()
+		links["delivery"] = tempLink
+
+		pdf.SetLink(links["delivery"].ID, 0, links["delivery"].Page)
+		CreateDeliveryRondo(pdf, number)
+
+		CreateByePageRondo(pdf, req.GetFirstpage().GetContacts(), req.GetFirstpage().GetWhocreate())
+	}
 
 	// 7. ВОЗВРАЩАЕМСЯ на страницу содержания для обновления номеров
 	currentPageBeforeUpdate := pdf.PageNo() // Сохраняем текущую страницу
@@ -577,7 +576,7 @@ func (s *PDFServer) generatePDF(req *createpdffile.CreatePDFRequest) ([]byte, er
 	} else {
 		s.Log.Warn("Побывал тут в Рондо" + strconv.Itoa(int(req.Firstpage.IdCompany)))
 		// COMMIT HERE
-		//CreateTableOfContentsRondo(pdf, links["tabelModel"].Page, links["characteristics"].Page, links, order)
+		CreateTableOfContentsRondo(pdf, links["tabelModel"].Page, links["characteristics"].Page, links, order)
 	}
 
 	// 8. ВАЖНО: Возвращаемся на последнюю страницу
